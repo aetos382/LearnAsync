@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/Sources/">
+    <Project Path="Sources/LearnAsync/LearnAsync.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Tests/LearnAsync.Tests/LearnAsync.Tests.csproj" />
+  </Folder>
+</Solution>

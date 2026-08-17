@@ -1,0 +1,51 @@
+<Project>
+  <PropertyGroup>
+    <IsAotCompatible Condition="'$(IsAotCompatible)' == '' and $([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net8.0'))">true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(CLSCompliant)' != ''">
+    <AssemblyAttribute Include="System.CLSCompliantAttribute">
+      <_Parameter1>$(CLSCompliant)</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UsePolyfills)' == 'true'">
+    <Compile Include="$(MSBuildThisFileDirectory)Polyfills\**\*.cs" LinkBase="Polyfills" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(RestorePackagesWithLockFile)' == 'true' and '$(ContinuousIntegrationBuild)' == 'true'">
+    <RestoreLockedMode>true</RestoreLockedMode>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IsRoslynComponent)' == 'true'">
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IsPackable)' == 'true'">
+    <Copyright>Copyright (c) 2026 aetos</Copyright>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>BSD-2-Clause-Patent</PackageLicenseExpression>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageProjectUrl>https://github.com/aetos382/LearnAsync</PackageProjectUrl>
+    <IncludeSymbols Condition="'$(IncludeSymbols)' == ''">true</IncludeSymbols>
+    <GeneratePackageOnBuild Condition="'$(GeneratePackageOnBuild)' == '' and '$(Configuration)' == 'Release' and '$(PublishAot)' != 'true'">true</GeneratePackageOnBuild>
+    <GenerateSBOM Condition="'$(GenerateSBOM)' == '' and '$(Configuration)' == 'Release'">true</GenerateSBOM>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IncludeSymbols)' == 'true'">
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)README.md">
+      <Pack>true</Pack>
+      <PackagePath>/</PackagePath>
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+
+</Project>

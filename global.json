@@ -1,0 +1,13 @@
+{
+  "sdk": {
+    "version": "11.0.100-preview.7.26381.103",
+    "rollForward": "disable",
+    "allowPrerelease": true
+  },
+  "msbuild-sdks": {
+    "MSTest.Sdk": "4.3.3"
+  },
+  "test": {
+    "runner": "Microsoft.Testing.Platform"
+  }
+}
