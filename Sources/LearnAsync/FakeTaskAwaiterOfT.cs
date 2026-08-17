@@ -31,7 +31,7 @@ public readonly struct FakeTaskAwaiter<T> :
         var executionContext = ExecutionContext.Capture();
         if (executionContext is not null)
         {
-            continuation = () => ExecutionContext.Run(executionContext, state => ((Action)state!)(), continuation);
+            continuation = () => ExecutionContext.Run(executionContext, static state => ((Action)state!)(), continuation);
         }
 
         this._state.AddContinuationAction(continuation);
