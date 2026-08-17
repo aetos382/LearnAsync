@@ -20,6 +20,7 @@ public readonly struct FakeTaskMethodBuilder
 
     public FakeTask Task { get; } = new();
 
+#pragma warning disable CA1822
     public void Start<TStateMachine>(
         ref TStateMachine stateMachine)
         where TStateMachine : IAsyncStateMachine
@@ -58,6 +59,7 @@ public readonly struct FakeTaskMethodBuilder
 
         awaiter.UnsafeOnCompleted(stateMachine.MoveNext);
     }
+#pragma warning restore
 
     public void SetResult()
     {

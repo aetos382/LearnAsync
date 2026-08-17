@@ -9,10 +9,12 @@ namespace LearnAsync;
 
 public readonly struct FakeTaskMethodBuilder<T>
 {
+#pragma warning disable CA1000
     public static FakeTaskMethodBuilder<T> Create()
     {
         return new();
     }
+#pragma warning restore
 
     public FakeTaskMethodBuilder()
     {
