@@ -113,7 +113,16 @@ internal sealed class FakeTaskState
                 }
             }
 
-            action();
+            try
+            {
+                action();
+            }
+#pragma warning disable CA1031
+            catch (Exception exception)
+            {
+                FakeTaskEvents.OnUnobservedContinuationException(exception);
+            }
+#pragma warning restore
         }
     }
 }

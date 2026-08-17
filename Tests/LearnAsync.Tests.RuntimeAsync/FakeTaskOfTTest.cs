@@ -276,6 +276,57 @@ public sealed class FakeTaskOfTTest
 
     [TestMethod]
     [Timeout(10_000, CooperativeCancellation = true)]
+    public async Task 継続が例外を投げても後続の継続は実行されUnobservedContinuationExceptionで観測できる()
+    {
+        var tcs = new TaskCompletionSource<int>();
+
+        var fakeTask = DoAsync<Task<int>, int>(tcs.Task, static state => state);
+
+        var awaiter = (ICriticalNotifyCompletion)fakeTask.GetAwaiter();
+
+        Assert.IsFalse(((FakeTaskAwaiter<int>)awaiter).IsCompleted);
+
+#pragma warning disable CA2201
+        var thrown = new Exception("Oops!");
+#pragma warning restore
+
+        var observed = new TaskCompletionSource<Exception>();
+
+        var firstRan = false;
+        var lastRan = false;
+
+        void Handler(object? sender, UnobservedContinuationExceptionEventArgs e)
+        {
+            if (ReferenceEquals(e.Exception, thrown))
+            {
+                observed.SetResult(e.Exception);
+            }
+        }
+
+        FakeTaskEvents.UnobservedContinuationException += Handler;
+
+        try
+        {
+            awaiter.UnsafeOnCompleted(() => firstRan = true);
+            awaiter.UnsafeOnCompleted(() => throw thrown);
+            awaiter.UnsafeOnCompleted(() => lastRan = true);
+
+            tcs.SetResult(42);
+
+            Assert.AreEqual(42, await fakeTask);
+
+            Assert.IsTrue(firstRan);
+            Assert.IsTrue(lastRan);
+            Assert.AreSame(thrown, await observed.Task.ConfigureAwait(false));
+        }
+        finally
+        {
+            FakeTaskEvents.UnobservedContinuationException -= Handler;
+        }
+    }
+
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 待機中のGetResultは後から設定された例外を投げる()
     {
         var testCancellationToken = this._testContext.CancellationToken;
