@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -488,22 +487,21 @@ public sealed class FakeTaskTest
 
     [TestMethod]
     [Timeout(10_000, CooperativeCancellation = true)]
-    public async Task 二回目以降の中断ではステートマシンの箱が作り直されない()
+    public async Task AwaitOnCompletedで中断してもAsyncLocalの値は保たれる()
     {
-        var first = new TaskCompletionSource();
-        var second = new TaskCompletionSource();
-        var suspended = new TaskCompletionSource();
+        var asyncLocal = new AsyncLocal<int>();
 
-        var boxes = new List<IAsyncStateMachine>();
+        var tcs = new TaskCompletionSource();
+
         var resultHolder = new ResultHolder();
 
-        var stateMachine = new TwoSuspensionStateMachine
+        asyncLocal.Value = 42;
+
+        var stateMachine = new OnCompletedStateMachine<FlowingAwaiter>
         {
             Builder = FakeTaskMethodBuilder.Create(),
-            First = first.Task,
-            Second = second.Task,
-            Suspended = suspended,
-            Boxes = boxes,
+            Awaiter = new(tcs.Task),
+            Read = () => asyncLocal.Value,
             Output = resultHolder
         };
 
@@ -511,38 +509,61 @@ public sealed class FakeTaskTest
 
         var fakeTask = stateMachine.Builder.Task;
 
-        first.SetResult();
+        asyncLocal.Value = 0;
 
-        await suspended.Task.ConfigureAwait(false);
-
-        second.SetResult();
+        tcs.SetResult();
 
         await fakeTask;
 
-        Assert.AreEqual(1, boxes.Count);
         Assert.AreEqual(42, resultHolder.Result);
     }
 
-    private struct TwoSuspensionStateMachine :
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public async Task AwaitOnCompletedに渡す継続はビルダーがExecutionContextで包まない()
+    {
+        var asyncLocal = new AsyncLocal<int>();
+
+        var awaiter = new ManualAwaiter();
+
+        var resultHolder = new ResultHolder();
+
+        asyncLocal.Value = 42;
+
+        var stateMachine = new OnCompletedStateMachine<ManualAwaiter>
+        {
+            Builder = FakeTaskMethodBuilder.Create(),
+            Awaiter = awaiter,
+            Read = () => asyncLocal.Value,
+            Output = resultHolder
+        };
+
+        stateMachine.Builder.Start(ref stateMachine);
+
+        var fakeTask = stateMachine.Builder.Task;
+
+        asyncLocal.Value = 0;
+
+        awaiter.Complete();
+
+        await fakeTask;
+
+        Assert.AreEqual(0, resultHolder.Result);
+    }
+
+    private struct OnCompletedStateMachine<TAwaiter> :
         IAsyncStateMachine
+        where TAwaiter : INotifyCompletion
     {
         public FakeTaskMethodBuilder Builder;
 
-        public Task First;
-
-        public Task Second;
-
-        public TaskCompletionSource Suspended;
-
-        public List<IAsyncStateMachine> Boxes;
+        public TAwaiter Awaiter;
 
         public ResultHolder Output;
 
+        public Func<int> Read;
+
         private int _stage;
-
-        private int _marker;
-
-        private ConfiguredTaskAwaitable.ConfiguredTaskAwaiter _awaiter;
 
         void IAsyncStateMachine.MoveNext()
         {
@@ -551,26 +572,13 @@ public sealed class FakeTaskTest
                 switch (this._stage)
                 {
                     case 0:
-                        this._awaiter = this.First.ConfigureAwait(false).GetAwaiter();
                         this._stage = 1;
-                        this.Builder.AwaitUnsafeOnCompleted(ref this._awaiter, ref this);
+                        this.Builder.AwaitOnCompleted(ref this.Awaiter, ref this);
                         break;
 
                     case 1:
-                        this._awaiter.GetResult();
-                        this._awaiter = this.Second.ConfigureAwait(false).GetAwaiter();
+                        this.Output.SetResult(this.Read());
                         this._stage = 2;
-                        this.Builder.AwaitUnsafeOnCompleted(ref this._awaiter, ref this);
-
-                        // 箱を作り直していると、この書き込みは継続が走る箱に届かない。
-                        this._marker = 42;
-                        this.Suspended.SetResult();
-                        break;
-
-                    case 2:
-                        this._awaiter.GetResult();
-                        this.Output.SetResult(this._marker);
-                        this._stage = 3;
                         this.Builder.SetResult();
                         break;
 
@@ -589,8 +597,48 @@ public sealed class FakeTaskTest
         public readonly void SetStateMachine(
             IAsyncStateMachine stateMachine)
         {
-            this.Boxes.Add(stateMachine);
             this.Builder.SetStateMachine(stateMachine);
+        }
+    }
+
+    // INotifyCompletion だけを実装し、ExecutionContext を流すアウェイター。
+    private sealed class FlowingAwaiter :
+        INotifyCompletion
+    {
+        private readonly Task _task;
+
+        public FlowingAwaiter(
+            Task task)
+        {
+            this._task = task;
+        }
+
+        public void OnCompleted(
+            Action continuation)
+        {
+            this._task.ConfigureAwait(false).GetAwaiter().OnCompleted(continuation);
+        }
+    }
+
+    // ExecutionContext を流さないアウェイター。継続は Complete の呼び出し元で走る。
+    private sealed class ManualAwaiter :
+        INotifyCompletion
+    {
+        private Action? _continuation;
+
+        public void OnCompleted(
+            Action continuation)
+        {
+            this._continuation = continuation;
+        }
+
+        public void Complete()
+        {
+            var continuation = this._continuation;
+
+            this._continuation = null;
+
+            continuation?.Invoke();
         }
     }
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 
@@ -59,7 +59,7 @@ public readonly struct FakeTaskMethodBuilder
         where TAwaiter : INotifyCompletion
         where TStateMachine : IAsyncStateMachine
     {
-        awaiter.OnCompleted(this.CreateContinuation(ref stateMachine));
+        awaiter.OnCompleted(this.CreateContinuation(ref stateMachine, false));
     }
 
     public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(
@@ -68,7 +68,7 @@ public readonly struct FakeTaskMethodBuilder
         where TAwaiter : ICriticalNotifyCompletion
         where TStateMachine : IAsyncStateMachine
     {
-        awaiter.UnsafeOnCompleted(this.CreateContinuation(ref stateMachine));
+        awaiter.UnsafeOnCompleted(this.CreateContinuation(ref stateMachine, true));
     }
 
     public void SetResult()
@@ -85,7 +85,8 @@ public readonly struct FakeTaskMethodBuilder
     }
 
     private Action CreateContinuation<TStateMachine>(
-        ref TStateMachine stateMachine)
+        ref TStateMachine stateMachine,
+        bool flowExecutionContext)
         where TStateMachine : IAsyncStateMachine
     {
         if (this._state.StateMachine is not { } boxedStateMachine)
@@ -94,16 +95,12 @@ public readonly struct FakeTaskMethodBuilder
             boxedStateMachine.SetStateMachine(boxedStateMachine);
         }
 
-        var context = ExecutionContext.Capture();
-
+        var context = flowExecutionContext ? ExecutionContext.Capture() : null;
         if (context is null)
         {
             return boxedStateMachine.MoveNext;
         }
 
-        return () => ExecutionContext.Run(
-            context,
-            static state => ((IAsyncStateMachine)state!).MoveNext(),
-            boxedStateMachine);
+        return () => ExecutionContext.Run(context, static state => ((IAsyncStateMachine)state!).MoveNext(), boxedStateMachine);
     }
 }
