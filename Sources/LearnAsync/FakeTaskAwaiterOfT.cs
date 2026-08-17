@@ -27,12 +27,14 @@ public readonly struct FakeTaskAwaiter<T> :
         ArgumentNullException.ThrowIfNull(continuation);
 
         var executionContext = ExecutionContext.Capture();
-        if (executionContext is not null)
+        if (executionContext is null)
         {
-            continuation = () => ExecutionContext.Run(executionContext, static state => ((Action)state!)(), continuation);
+            this._state.AddContinuationAction(continuation);
+            return;
         }
 
-        this._state.AddContinuationAction(continuation);
+        this._state.AddContinuationAction(
+            () => ExecutionContext.Run(executionContext, static state => ((Action)state!)(), continuation));
     }
 
     void ICriticalNotifyCompletion.UnsafeOnCompleted(

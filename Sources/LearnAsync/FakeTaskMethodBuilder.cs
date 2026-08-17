@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace LearnAsync;
 
@@ -23,9 +24,22 @@ public readonly struct FakeTaskMethodBuilder
         ref TStateMachine stateMachine)
         where TStateMachine : IAsyncStateMachine
     {
-        ArgumentNullException.ThrowIfNull(stateMachine);
+        var previousExecutionContext = ExecutionContext.Capture();
+        var previousSynchronizationContext = SynchronizationContext.Current;
 
-        stateMachine.MoveNext();
+        try
+        {
+            stateMachine.MoveNext();
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previousSynchronizationContext);
+
+            if (previousExecutionContext is not null)
+            {
+                ExecutionContext.Restore(previousExecutionContext);
+            }
+        }
     }
 
     public void SetStateMachine(
@@ -40,10 +54,7 @@ public readonly struct FakeTaskMethodBuilder
         where TAwaiter : INotifyCompletion
         where TStateMachine : IAsyncStateMachine
     {
-        ArgumentNullException.ThrowIfNull(awaiter);
-        ArgumentNullException.ThrowIfNull(stateMachine);
-
-        awaiter.OnCompleted(stateMachine.MoveNext);
+        awaiter.OnCompleted(CreateContinuation(ref stateMachine));
     }
 
     public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(
@@ -52,10 +63,7 @@ public readonly struct FakeTaskMethodBuilder
         where TAwaiter : ICriticalNotifyCompletion
         where TStateMachine : IAsyncStateMachine
     {
-        ArgumentNullException.ThrowIfNull(awaiter);
-        ArgumentNullException.ThrowIfNull(stateMachine);
-
-        awaiter.UnsafeOnCompleted(stateMachine.MoveNext);
+        awaiter.UnsafeOnCompleted(CreateContinuation(ref stateMachine));
     }
 #pragma warning restore
 
@@ -70,5 +78,23 @@ public readonly struct FakeTaskMethodBuilder
         ArgumentNullException.ThrowIfNull(exception);
 
         this.Task.SetException(exception);
+    }
+
+    private static Action CreateContinuation<TStateMachine>(
+        ref TStateMachine stateMachine)
+        where TStateMachine : IAsyncStateMachine
+    {
+        IAsyncStateMachine boxedStateMachine = stateMachine;
+
+        var context = ExecutionContext.Capture();
+        if (context is null)
+        {
+            return boxedStateMachine.MoveNext;
+        }
+
+        return () => ExecutionContext.Run(
+            context,
+            static state => ((IAsyncStateMachine)state!).MoveNext(),
+            boxedStateMachine);
     }
 }

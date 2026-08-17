@@ -22,18 +22,13 @@ public sealed class FakeTaskTest
     [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 同期的に完了するFakeTaskをawaitする()
     {
-        var asyncLocal = new AsyncLocal<int>
-        {
-            Value = 42
-        };
-
         var resultHolder = new ResultHolder();
 
         var fakeTask = DoAsync(
-            (Input: asyncLocal, Output: resultHolder),
+            (Input: 42, Output: resultHolder),
             static state =>
             {
-                state.Output.SetResult(state.Input.Value);
+                state.Output.SetResult(state.Input);
                 return Task.CompletedTask;
             });
 
@@ -71,34 +66,106 @@ public sealed class FakeTaskTest
 
     [TestMethod]
     [Timeout(10_000, CooperativeCancellation = true)]
-    public async Task 継続はキャプチャされたExecutionContextの上で実行される()
+    public async Task 呼び出し元のAsyncLocalの値がasyncFakeTaskメソッドの中で見える()
     {
-        var asyncLocal = new AsyncLocal<int>();
+        var asyncLocal = new AsyncLocal<int>
+        {
+            Value = 42
+        };
 
         var resultHolder = new ResultHolder();
 
+        await ReadAsync();
+
+        Assert.AreEqual(42, resultHolder.Result);
+
+        async FakeTask ReadAsync()
+        {
+            resultHolder.SetResult(asyncLocal.Value);
+
+            await Task.CompletedTask.ConfigureAwait(false);
+        }
+    }
+
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public async Task AsyncLocalへの書き込みはasyncFakeTaskメソッドの外に漏れない()
+    {
+        var asyncLocal = new AsyncLocal<int>();
+
+        var fakeTask = SetAsync();
+
+        Assert.AreEqual(0, asyncLocal.Value);
+
+        await fakeTask;
+
+        async FakeTask SetAsync()
+        {
+            asyncLocal.Value = 42;
+
+            await Task.CompletedTask.ConfigureAwait(false);
+        }
+    }
+
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public async Task AsyncLocalの値はawaitをまたいで保たれる()
+    {
+        var asyncLocal = new AsyncLocal<int>();
+
         var tcs = new TaskCompletionSource();
 
-        var fakeTask = default(FakeTask);
+        var resultHolder = new ResultHolder();
 
-        // async FakeTask メソッドの開始を別スレッドに隔離する。
-        // FakeTaskMethodBuilder.Start は ExecutionContext を復元しないため、
-        // メソッド内での AsyncLocal への書き込みが呼び出し元に漏れる。
-        // 隔離しないと、継続を実行する側 (このスレッド) の ExecutionContext が汚染され、
-        // ExecutionContext がフローしたかどうかを判定できなくなる。
-        var starter = new Thread(() =>
+        var fakeTask = SetAwaitReadAsync();
+
+        Assert.AreEqual(0, asyncLocal.Value);
+
+        tcs.SetResult();
+
+        await fakeTask;
+
+        Assert.AreEqual(42, resultHolder.Result);
+
+        async FakeTask SetAwaitReadAsync()
         {
-            fakeTask = SetAndReadAsyncLocalAsync(asyncLocal, resultHolder, tcs.Task);
-        });
+            asyncLocal.Value = 42;
 
-        starter.Start();
-        starter.Join();
+            await tcs.Task.ConfigureAwait(false);
 
-        Assert.AreEqual(0, asyncLocal.Value, "継続を実行するスレッドの AsyncLocal には値が入っていない。");
+            resultHolder.SetResult(asyncLocal.Value);
+        }
+    }
 
-        // 継続 (ステートマシンの MoveNext) はこのスレッドの上で実行される。
-        // 中断時にキャプチャした ExecutionContext を復元して実行しなければ、
-        // 中断前に書き込んだ AsyncLocal の値が失われる。
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public async Task OnCompletedで登録した継続はキャプチャしたExecutionContextの上で実行される()
+    {
+        var testCancellationToken = this._testContext.CancellationToken;
+
+        var asyncLocal = new AsyncLocal<int>();
+
+        var tcs = new TaskCompletionSource();
+
+        var resultHolder = new ResultHolder();
+
+        var fakeTask = DoAsync(
+            (Signal: tcs.Task, CancellationToken: testCancellationToken),
+            static async state =>
+            {
+                await state.Signal.WaitAsync(state.CancellationToken).ConfigureAwait(false);
+            });
+
+        var awaiter = fakeTask.GetAwaiter();
+
+        Assert.IsFalse(awaiter.IsCompleted);
+
+        asyncLocal.Value = 42;
+
+        ((INotifyCompletion)awaiter).OnCompleted(() => resultHolder.SetResult(asyncLocal.Value));
+
+        asyncLocal.Value = 0;
+
         tcs.SetResult();
 
         await fakeTask;
@@ -123,22 +190,17 @@ public sealed class FakeTaskTest
     {
         var testCancellationToken = this._testContext.CancellationToken;
 
-        var asyncLocal = new AsyncLocal<int>
-        {
-            Value = 42
-        };
-
         var resultHolder = new ResultHolder();
 
         var tcs = new TaskCompletionSource();
 
         var fakeTask = DoAsync(
-            (Input: asyncLocal, Output: resultHolder, Signal: tcs.Task, CancellationToken: testCancellationToken),
+            (Input: 42, Output: resultHolder, Signal: tcs.Task, CancellationToken: testCancellationToken),
             static async state =>
             {
                 await state.Signal.WaitAsync(state.CancellationToken).ConfigureAwait(false);
 
-                state.Output.SetResult(state.Input.Value);
+                state.Output.SetResult(state.Input);
             });
 
         var task = DelayedSignal(tcs, TimeSpan.FromSeconds(3), testCancellationToken);
@@ -153,20 +215,15 @@ public sealed class FakeTaskTest
     [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 同期的に完了するFakeTaskを自前のステートマシンで回す()
     {
-        var asyncLocal = new AsyncLocal<int>
-        {
-            Value = 42
-        };
-
         var resultHolder = new ResultHolder();
 
-        await RunStateMachine(asyncLocal, resultHolder);
+        await RunStateMachine(42, resultHolder);
 
         Assert.AreEqual(42, resultHolder.Result);
 
-        static FakeTask RunStateMachine(AsyncLocal<int> input, ResultHolder output)
+        static FakeTask RunStateMachine(int input, ResultHolder output)
         {
-            var stateMachine = new DoAsyncStateMachine<(AsyncLocal<int> Input, ResultHolder Output)>
+            var stateMachine = new DoAsyncStateMachine<(int Input, ResultHolder Output)>
             {
                 Builder = FakeTaskMethodBuilder.Create(),
                 Parameters = new()
@@ -174,7 +231,7 @@ public sealed class FakeTaskTest
                     State = (input, output),
                     Action = static state =>
                     {
-                        state.Output.SetResult(state.Input.Value);
+                        state.Output.SetResult(state.Input);
                         return Task.CompletedTask;
                     }
                 }
@@ -227,16 +284,11 @@ public sealed class FakeTaskTest
     {
         var testCancellationToken = this._testContext.CancellationToken;
 
-        var asyncLocal = new AsyncLocal<int>
-        {
-            Value = 42
-        };
-
         var resultHolder = new ResultHolder();
 
         var tcs = new TaskCompletionSource();
 
-        var fakeTask = RunStateMachine(asyncLocal, resultHolder, tcs.Task, testCancellationToken);
+        var fakeTask = RunStateMachine(42, resultHolder, tcs.Task, testCancellationToken);
 
         var task = DelayedSignal(tcs, TimeSpan.FromSeconds(3), testCancellationToken);
 
@@ -245,9 +297,9 @@ public sealed class FakeTaskTest
 
         Assert.AreEqual(42, resultHolder.Result);
 
-        static FakeTask RunStateMachine(AsyncLocal<int> input, ResultHolder output, Task signal, CancellationToken cancellationToken)
+        static FakeTask RunStateMachine(int input, ResultHolder output, Task signal, CancellationToken cancellationToken)
         {
-            var stateMachine = new DoAsyncStateMachine<(AsyncLocal<int> Input, ResultHolder Output, Task Signal, CancellationToken CancellationToken)>
+            var stateMachine = new DoAsyncStateMachine<(int Input, ResultHolder Output, Task Signal, CancellationToken CancellationToken)>
             {
                 Builder = FakeTaskMethodBuilder.Create(),
                 Parameters = new()
@@ -256,7 +308,7 @@ public sealed class FakeTaskTest
                     Action = static async state =>
                     {
                         await state.Signal.WaitAsync(state.CancellationToken).ConfigureAwait(false);
-                        state.Output.SetResult(state.Input.Value);
+                        state.Output.SetResult(state.Input);
                     }
                 }
             };
@@ -267,6 +319,33 @@ public sealed class FakeTaskTest
 
             return builder.Task;
         }
+    }
+
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public async Task 中断したステートマシンの状態は本体に書き戻される()
+    {
+        var tcs = new TaskCompletionSource();
+
+        var stateMachine = new DoAsyncStateMachine<Task>
+        {
+            Builder = FakeTaskMethodBuilder.Create(),
+            Parameters = new()
+            {
+                State = tcs.Task,
+                Action = static state => state
+            }
+        };
+
+        ref var builder = ref stateMachine.Builder;
+
+        builder.Start(ref stateMachine);
+
+        Assert.AreEqual(DoAsyncStateMachine<Task>.State.Stage1Completed, stateMachine.CurrentState);
+
+        tcs.SetResult();
+
+        await builder.Task;
     }
 
     [TestMethod]
@@ -341,18 +420,18 @@ public sealed class FakeTaskTest
 
         private ConfiguredTaskAwaitable.ConfiguredTaskAwaiter _awaiter;
 
-        readonly void IAsyncStateMachine.MoveNext()
+        void IAsyncStateMachine.MoveNext()
         {
             try
             {
                 switch (this.CurrentState)
                 {
                     case State.NotStarted:
-                        Stage1(this);
+                        Stage1(ref this);
                         break;
 
                     case State.Stage1Completed:
-                        Stage2(this);
+                        Stage2(ref this);
                         break;
 
                     case State.Completed:
@@ -365,11 +444,11 @@ public sealed class FakeTaskTest
 #pragma warning disable CA1031
             catch (Exception exception)
             {
-                SetException(this, exception);
+                SetException(ref this, exception);
             }
 #pragma warning restore
 
-            static void Stage1(DoAsyncStateMachine<TState> self)
+            static void Stage1(ref DoAsyncStateMachine<TState> self)
             {
                 var awaiter = self.Parameters.Action(self.Parameters.State).ConfigureAwait(false).GetAwaiter();
 
@@ -387,14 +466,14 @@ public sealed class FakeTaskTest
                 }
             }
 
-            static void Stage2(DoAsyncStateMachine<TState> self)
+            static void Stage2(ref DoAsyncStateMachine<TState> self)
             {
                 self._awaiter.GetResult();
                 self.Builder.SetResult();
                 self.CurrentState = State.Completed;
             }
 
-            static void SetException(DoAsyncStateMachine<TState> self, Exception exception)
+            static void SetException(ref DoAsyncStateMachine<TState> self, Exception exception)
             {
                 self.Builder.SetException(exception);
                 self.CurrentState = State.Completed;
@@ -425,23 +504,6 @@ public sealed class FakeTaskTest
     {
         await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
         tcs.TrySetResult();
-    }
-
-    // await をまたいで AsyncLocal の値が保たれるかを見るための async FakeTask メソッド。
-    // 中断と再開を扱うのは FakeTaskMethodBuilder なので、ExecutionContext をフローさせる
-    // 責務も FakeTaskMethodBuilder にある。
-    // (AsyncLocal の読み書きを async ラムダの中で行うと、そのラムダの中断は
-    //  AsyncTaskMethodBuilder が扱うことになり、FakeTaskMethodBuilder の検証にならない)
-    private static async FakeTask SetAndReadAsyncLocalAsync(
-        AsyncLocal<int> asyncLocal,
-        ResultHolder output,
-        Task signal)
-    {
-        asyncLocal.Value = 42;
-
-        await signal.ConfigureAwait(false);
-
-        output.SetResult(asyncLocal.Value);
     }
 
     private static async FakeTask DoAsync<TState>(TState state, Func<TState, Task> action)
