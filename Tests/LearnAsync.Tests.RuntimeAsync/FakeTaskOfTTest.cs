@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -280,7 +280,7 @@ public sealed class FakeTaskOfTTest
     {
         var tcs = new TaskCompletionSource<int>();
 
-        var fakeTask = DoAsync<Task<int>, int>(tcs.Task, static state => state);
+        var fakeTask = DoAsync(tcs.Task, static state => state);
 
         var awaiter = (ICriticalNotifyCompletion)fakeTask.GetAwaiter();
 

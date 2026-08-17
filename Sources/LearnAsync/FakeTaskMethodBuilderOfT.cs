@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 
@@ -98,7 +98,7 @@ public readonly struct FakeTaskMethodBuilder<T>
         var context = flowExecutionContext ? ExecutionContext.Capture() : null;
         if (context is null)
         {
-            return boxedStateMachine.MoveNext;
+            return () => boxedStateMachine.MoveNext();
         }
 
         return () => ExecutionContext.Run(context, static state => ((IAsyncStateMachine)state!).MoveNext(), boxedStateMachine);
