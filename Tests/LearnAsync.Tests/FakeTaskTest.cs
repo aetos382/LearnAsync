@@ -61,7 +61,7 @@ public sealed class FakeTaskTest
         var fakeTask = DoAsync(static () => throw new Exception("Oops!"));
 #pragma warning restore
 
-        await Assert.ThrowsAsync<Exception>(async () => await fakeTask).ConfigureAwait(false);
+        await Assert.ThrowsAsync<Exception>(async () => await fakeTask, "Oops!").ConfigureAwait(false);
     }
 
     [TestMethod]
@@ -139,7 +139,9 @@ public sealed class FakeTaskTest
     [Timeout(10_000)]
     public async Task 例外で同期的に完了するFakeTaskを自前のステートマシンで回す()
     {
-        await Assert.ThrowsAsync<Exception>(static async () => await RunStateMachine()).ConfigureAwait(false);
+        var fakeTask = RunStateMachine();
+
+        await Assert.ThrowsAsync<Exception>(async () => await fakeTask, "Oops!").ConfigureAwait(false);
 
         static FakeTask RunStateMachine()
         {
@@ -226,7 +228,7 @@ public sealed class FakeTaskTest
 
         var task = DelayedSignal(tcs, TimeSpan.FromSeconds(3), testCancellationToken);
 
-        await Assert.ThrowsAsync<Exception>(async () => await fakeTask).ConfigureAwait(false);
+        await Assert.ThrowsAsync<Exception>(async () => await fakeTask, "Oops!").ConfigureAwait(false);
         await tcs.Task.ConfigureAwait(false);
 
         static FakeTask RunStateMachine(Task signal, CancellationToken cancellationToken)

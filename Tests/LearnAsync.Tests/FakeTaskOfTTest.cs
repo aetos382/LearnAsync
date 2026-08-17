@@ -77,7 +77,7 @@ public sealed class FakeTaskOfTTest
 #pragma warning restore
             });
 
-        await Assert.ThrowsAsync<Exception>(async () => await fakeTask).ConfigureAwait(false);
+        await Assert.ThrowsAsync<Exception>(async () => await fakeTask, "Oops!").ConfigureAwait(false);
     }
 
     [TestMethod]
@@ -263,7 +263,7 @@ public sealed class FakeTaskOfTTest
 
         var task = DelayedSignal(tcs, TimeSpan.FromSeconds(3), testCancellationToken);
 
-        await Assert.ThrowsAsync<Exception>(async () => await fakeTask).ConfigureAwait(false);
+        await Assert.ThrowsAsync<Exception>(async () => await fakeTask, "Oops!").ConfigureAwait(false);
 
         await tcs.Task.ConfigureAwait(false);
 
