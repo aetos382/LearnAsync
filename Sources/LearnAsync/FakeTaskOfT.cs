@@ -9,6 +9,6 @@ public struct FakeTask<T>
 {
     public FakeTaskAwaiter<T> GetAwaiter()
     {
-        return default;
+        return new();
     }
 }

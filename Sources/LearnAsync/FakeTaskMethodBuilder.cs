@@ -25,6 +25,8 @@ public readonly struct FakeTaskMethodBuilder
         where TStateMachine : IAsyncStateMachine
     {
         ArgumentNullException.ThrowIfNull(stateMachine);
+
+        stateMachine.MoveNext();
     }
 
     public void SetStateMachine(

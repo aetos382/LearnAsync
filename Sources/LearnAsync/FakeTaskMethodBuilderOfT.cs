@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace LearnAsync;
 
@@ -7,10 +8,12 @@ namespace LearnAsync;
 
 public struct FakeTaskMethodBuilder<T>
 {
+#pragma warning disable CA1000
     public static FakeTaskMethodBuilder<T> Create()
     {
         return new();
     }
+#pragma warning restore
 
     public FakeTaskMethodBuilder()
     {
@@ -23,6 +26,8 @@ public struct FakeTaskMethodBuilder<T>
         where TStateMachine : IAsyncStateMachine
     {
         ArgumentNullException.ThrowIfNull(stateMachine);
+
+        stateMachine.MoveNext();
     }
 
     public void SetStateMachine(

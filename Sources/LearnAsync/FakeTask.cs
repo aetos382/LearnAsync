@@ -9,6 +9,6 @@ public readonly struct FakeTask
 {
     public FakeTaskAwaiter GetAwaiter()
     {
-        return default;
+        return new();
     }
 }

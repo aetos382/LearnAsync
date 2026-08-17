@@ -5,11 +5,11 @@ using System.Threading.Tasks;
 namespace LearnAsync.Tests.RuntimeAsync;
 
 [TestClass]
-public sealed class Test1
+public sealed class FakeTaskTest
 {
     private readonly TestContext _testContext;
 
-    public Test1(
+    public FakeTaskTest(
         TestContext testContext)
     {
         ArgumentNullException.ThrowIfNull(testContext);
@@ -18,13 +18,13 @@ public sealed class Test1
     }
 
     [TestMethod]
-    public async Task TestMethod1()
+    public async Task 戻り値のない非同期メソッドを呼んでawaitする()
     {
         await this.DoAsync(this._testContext.CancellationToken);
     }
 
     [TestMethod]
-    public async Task TestMethod2()
+    public async Task 戻り値のある非同期メソッドを呼んでawaitする()
     {
         var result = await this.GetIntAsync(this._testContext.CancellationToken);
 
