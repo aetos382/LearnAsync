@@ -1,10 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-
-using Microsoft.VisualStudio.TestPlatform.Utilities;
 
 namespace LearnAsync.Tests;
 
@@ -22,7 +19,7 @@ public sealed class FakeTaskOfTTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 同期的に完了するFakeTaskOfTをawaitする()
     {
         var asyncLocal = new AsyncLocal<int>
@@ -43,7 +40,7 @@ public sealed class FakeTaskOfTTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 同期的に完了するFakeTaskOfTを複数回awaitする()
     {
         var asyncLocal = new AsyncLocal<int>
@@ -66,7 +63,7 @@ public sealed class FakeTaskOfTTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public void 完了済みのFakeTaskOfTに登録した継続はその場で実行される()
     {
         var fakeTask = DoAsync(static () => Task.FromResult(42));
@@ -84,7 +81,42 @@ public sealed class FakeTaskOfTTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public async Task 継続はキャプチャされたExecutionContextの上で実行される()
+    {
+        var asyncLocal = new AsyncLocal<int>();
+
+        var tcs = new TaskCompletionSource();
+
+        var fakeTask = default(FakeTask<int>);
+
+        // async FakeTask メソッドの開始を別スレッドに隔離する。
+        // FakeTaskMethodBuilder<T>.Start は ExecutionContext を復元しないため、
+        // メソッド内での AsyncLocal への書き込みが呼び出し元に漏れる。
+        // 隔離しないと、継続を実行する側 (このスレッド) の ExecutionContext が汚染され、
+        // ExecutionContext がフローしたかどうかを判定できなくなる。
+        var starter = new Thread(() =>
+        {
+            fakeTask = SetAndReadAsyncLocalAsync(asyncLocal, tcs.Task);
+        });
+
+        starter.Start();
+        starter.Join();
+
+        Assert.AreEqual(0, asyncLocal.Value, "継続を実行するスレッドの AsyncLocal には値が入っていない。");
+
+        // 継続 (ステートマシンの MoveNext) はこのスレッドの上で実行される。
+        // 中断時にキャプチャした ExecutionContext を復元して実行しなければ、
+        // 中断前に書き込んだ AsyncLocal の値が失われる。
+        tcs.SetResult();
+
+        var result = await fakeTask;
+
+        Assert.AreEqual(42, result);
+    }
+
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 例外で同期的に完了するFakeTaskOfTをawaitする()
     {
         var fakeTask = DoAsync<int>(
@@ -99,7 +131,7 @@ public sealed class FakeTaskOfTTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 非同期的に完了するFakeTaskOfTをawaitする()
     {
         var testCancellationToken = this._testContext.CancellationToken;
@@ -129,7 +161,7 @@ public sealed class FakeTaskOfTTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 非同期的に完了するFakeTaskOfTを複数回awaitする()
     {
         var testCancellationToken = this._testContext.CancellationToken;
@@ -162,7 +194,7 @@ public sealed class FakeTaskOfTTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 例外で非同期的に完了するFakeTaskOfTをawaitする()
     {
         var testCancellationToken = this._testContext.CancellationToken;
@@ -188,7 +220,7 @@ public sealed class FakeTaskOfTTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 同期的に完了するFakeTaskOfTを自前のステートマシンで回す()
     {
         var asyncLocal = new AsyncLocal<int>
@@ -224,7 +256,7 @@ public sealed class FakeTaskOfTTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 非同期的に完了するFakeTaskOfTを自前のステートマシンで回す()
     {
         var testCancellationToken = this._testContext.CancellationToken;
@@ -270,7 +302,7 @@ public sealed class FakeTaskOfTTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 例外で非同期的に完了するFakeTaskOfTを自前のステートマシンで回す()
     {
         var testCancellationToken = this._testContext.CancellationToken;
@@ -416,6 +448,22 @@ public sealed class FakeTaskOfTTest
     {
         await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
         tcs.TrySetResult();
+    }
+
+    // await をまたいで AsyncLocal の値が保たれるかを見るための async FakeTask メソッド。
+    // 中断と再開を扱うのは FakeTaskMethodBuilder<T> なので、ExecutionContext をフローさせる
+    // 責務も FakeTaskMethodBuilder<T> にある。
+    // (AsyncLocal の読み書きを async ラムダの中で行うと、そのラムダの中断は
+    //  AsyncTaskMethodBuilder<T> が扱うことになり、FakeTaskMethodBuilder<T> の検証にならない)
+    private static async FakeTask<int> SetAndReadAsyncLocalAsync(
+        AsyncLocal<int> asyncLocal,
+        Task signal)
+    {
+        asyncLocal.Value = 42;
+
+        await signal.ConfigureAwait(false);
+
+        return asyncLocal.Value;
     }
 
     private static async FakeTask<TResult> DoAsync<TState, TResult>(TState state, Func<TState, Task<TResult>> action)

@@ -1,10 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-
-using Microsoft.VisualStudio.TestPlatform.Utilities;
 
 namespace LearnAsync.Tests.RuntimeAsync;
 
@@ -22,7 +19,7 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 同期的に完了するFakeTaskをawaitする()
     {
         var asyncLocal = new AsyncLocal<int>
@@ -56,7 +53,7 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 非同期的に完了するFakeTaskをawaitする()
     {
         var testCancellationToken = this._testContext.CancellationToken;
@@ -88,7 +85,7 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 同期的に完了するFakeTaskを自前のステートマシンで回す()
     {
         var asyncLocal = new AsyncLocal<int>
@@ -127,7 +124,7 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 例外で同期的に完了するFakeTaskを自前のステートマシンで回す()
     {
         var fakeTask = RunStateMachine();
@@ -160,7 +157,7 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 非同期的に完了するFakeTaskを自前のステートマシンで回す()
     {
         var testCancellationToken = this._testContext.CancellationToken;
@@ -208,7 +205,7 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 例外で非同期的に完了するFakeTaskを自前のステートマシンで回す()
     {
         var testCancellationToken = this._testContext.CancellationToken;

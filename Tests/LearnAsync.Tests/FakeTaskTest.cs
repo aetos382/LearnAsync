@@ -1,10 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-
-using Microsoft.VisualStudio.TestPlatform.Utilities;
 
 namespace LearnAsync.Tests;
 
@@ -22,7 +19,7 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 同期的に完了するFakeTaskをawaitする()
     {
         var asyncLocal = new AsyncLocal<int>
@@ -46,6 +43,7 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 同期的に完了するFakeTaskを複数回awaitする()
     {
         var fakeTask = DoAsync(static () => Task.CompletedTask);
@@ -55,7 +53,7 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public void 完了済みのFakeTaskに登録した継続はその場で実行される()
     {
         var fakeTask = DoAsync(static () => Task.CompletedTask);
@@ -72,6 +70,44 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public async Task 継続はキャプチャされたExecutionContextの上で実行される()
+    {
+        var asyncLocal = new AsyncLocal<int>();
+
+        var resultHolder = new ResultHolder();
+
+        var tcs = new TaskCompletionSource();
+
+        var fakeTask = default(FakeTask);
+
+        // async FakeTask メソッドの開始を別スレッドに隔離する。
+        // FakeTaskMethodBuilder.Start は ExecutionContext を復元しないため、
+        // メソッド内での AsyncLocal への書き込みが呼び出し元に漏れる。
+        // 隔離しないと、継続を実行する側 (このスレッド) の ExecutionContext が汚染され、
+        // ExecutionContext がフローしたかどうかを判定できなくなる。
+        var starter = new Thread(() =>
+        {
+            fakeTask = SetAndReadAsyncLocalAsync(asyncLocal, resultHolder, tcs.Task);
+        });
+
+        starter.Start();
+        starter.Join();
+
+        Assert.AreEqual(0, asyncLocal.Value, "継続を実行するスレッドの AsyncLocal には値が入っていない。");
+
+        // 継続 (ステートマシンの MoveNext) はこのスレッドの上で実行される。
+        // 中断時にキャプチャした ExecutionContext を復元して実行しなければ、
+        // 中断前に書き込んだ AsyncLocal の値が失われる。
+        tcs.SetResult();
+
+        await fakeTask;
+
+        Assert.AreEqual(42, resultHolder.Result);
+    }
+
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 例外で同期的に完了するタスクをawaitする()
     {
 #pragma warning disable CA2201
@@ -82,7 +118,7 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 非同期的に完了するFakeTaskをawaitする()
     {
         var testCancellationToken = this._testContext.CancellationToken;
@@ -114,7 +150,7 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 同期的に完了するFakeTaskを自前のステートマシンで回す()
     {
         var asyncLocal = new AsyncLocal<int>
@@ -153,7 +189,7 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 例外で同期的に完了するFakeTaskを自前のステートマシンで回す()
     {
         var fakeTask = RunStateMachine();
@@ -186,7 +222,7 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 非同期的に完了するFakeTaskを自前のステートマシンで回す()
     {
         var testCancellationToken = this._testContext.CancellationToken;
@@ -234,7 +270,7 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
-    [Timeout(10_000)]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 例外で非同期的に完了するFakeTaskを自前のステートマシンで回す()
     {
         var testCancellationToken = this._testContext.CancellationToken;
@@ -389,6 +425,23 @@ public sealed class FakeTaskTest
     {
         await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
         tcs.TrySetResult();
+    }
+
+    // await をまたいで AsyncLocal の値が保たれるかを見るための async FakeTask メソッド。
+    // 中断と再開を扱うのは FakeTaskMethodBuilder なので、ExecutionContext をフローさせる
+    // 責務も FakeTaskMethodBuilder にある。
+    // (AsyncLocal の読み書きを async ラムダの中で行うと、そのラムダの中断は
+    //  AsyncTaskMethodBuilder が扱うことになり、FakeTaskMethodBuilder の検証にならない)
+    private static async FakeTask SetAndReadAsyncLocalAsync(
+        AsyncLocal<int> asyncLocal,
+        ResultHolder output,
+        Task signal)
+    {
+        asyncLocal.Value = 42;
+
+        await signal.ConfigureAwait(false);
+
+        output.SetResult(asyncLocal.Value);
     }
 
     private static async FakeTask DoAsync<TState>(TState state, Func<TState, Task> action)
