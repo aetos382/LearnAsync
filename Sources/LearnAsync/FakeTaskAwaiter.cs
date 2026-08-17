@@ -7,12 +7,20 @@ namespace LearnAsync;
 
 #pragma warning disable CA1815
 
-public struct FakeTaskAwaiter :
+public readonly struct FakeTaskAwaiter :
     ICriticalNotifyCompletion
 {
-    private bool _isCompleted;
+    private readonly FakeTaskState _state;
 
-    public bool IsCompleted => this._isCompleted;
+    internal FakeTaskAwaiter(
+        FakeTaskState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+
+        this._state = state;
+    }
+
+    public bool IsCompleted => this._state.IsCompleted;
 
     void INotifyCompletion.OnCompleted(
         Action continuation)
@@ -28,5 +36,6 @@ public struct FakeTaskAwaiter :
 
     public void GetResult()
     {
+        this._state.Wait();
     }
 }

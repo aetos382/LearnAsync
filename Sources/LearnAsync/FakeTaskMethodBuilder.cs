@@ -43,6 +43,8 @@ public readonly struct FakeTaskMethodBuilder
     {
         ArgumentNullException.ThrowIfNull(awaiter);
         ArgumentNullException.ThrowIfNull(stateMachine);
+
+        awaiter.OnCompleted(stateMachine.MoveNext);
     }
 
     public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(
@@ -53,15 +55,20 @@ public readonly struct FakeTaskMethodBuilder
     {
         ArgumentNullException.ThrowIfNull(awaiter);
         ArgumentNullException.ThrowIfNull(stateMachine);
+
+        awaiter.UnsafeOnCompleted(stateMachine.MoveNext);
     }
 
     public void SetResult()
     {
+        this.Task.SetResult();
     }
 
     public void SetException(
         Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
+
+        this.Task.SetException(exception);
     }
 }
