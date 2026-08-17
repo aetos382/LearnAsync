@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace LearnAsync.Tests;
+namespace LearnAsync.Tests.RuntimeAsync;
 
 [TestClass]
 public sealed class Test1

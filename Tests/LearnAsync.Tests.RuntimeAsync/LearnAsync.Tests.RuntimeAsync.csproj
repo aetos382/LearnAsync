@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net11.0</TargetFramework>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <Features>$(Features);runtime-async=on</Features>
   </PropertyGroup>
 
   <ItemGroup>

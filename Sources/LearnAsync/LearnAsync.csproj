@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net11.0</TargetFramework>
-    <Features>$(Features);runtime-async=on</Features>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
 </Project>

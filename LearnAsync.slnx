@@ -3,6 +3,7 @@
     <Project Path="Sources/LearnAsync/LearnAsync.csproj" />
   </Folder>
   <Folder Name="/Tests/">
+    <Project Path="Tests/LearnAsync.Tests.RuntimeAsync/LearnAsync.Tests.RuntimeAsync.csproj" />
     <Project Path="Tests/LearnAsync.Tests/LearnAsync.Tests.csproj" />
   </Folder>
 </Solution>
