@@ -276,6 +276,50 @@ public sealed class FakeTaskOfTTest
 
     [TestMethod]
     [Timeout(10_000, CooperativeCancellation = true)]
+    public async Task 待機中のGetResultは後から設定された例外を投げる()
+    {
+        var testCancellationToken = this._testContext.CancellationToken;
+
+        var tcs = new TaskCompletionSource();
+
+        var fakeTask = DoAsync<(Task Signal, CancellationToken CancellationToken), int>(
+            (tcs.Task, testCancellationToken),
+            static async state =>
+            {
+                await state.Signal.WaitAsync(state.CancellationToken).ConfigureAwait(false);
+
+#pragma warning disable CA2201
+                throw new Exception("Oops!");
+#pragma warning restore
+            });
+
+        var awaiter = fakeTask.GetAwaiter();
+
+        Assert.IsFalse(awaiter.IsCompleted);
+
+        using var started = new ManualResetEventSlim(false);
+
+        var getResult = Task.Run(
+            () =>
+            {
+                started.Set();
+                return awaiter.GetResult();
+            },
+            testCancellationToken);
+
+        started.Wait(testCancellationToken);
+
+        await Task.Delay(100, testCancellationToken).ConfigureAwait(false);
+
+        Assert.IsFalse(getResult.IsCompleted, "GetResult は完了までブロックするはず。");
+
+        tcs.SetResult();
+
+        await Assert.ThrowsAsync<Exception>(async () => await getResult.ConfigureAwait(false), "Oops!").ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task 同期的に完了するFakeTaskOfTを自前のステートマシンで回す()
     {
         var result = await RunStateMachine(42);

@@ -83,10 +83,9 @@ internal sealed class FakeTaskState<T>
     {
         lock (this._lock)
         {
-            this._edi?.Throw();
-
             if (this._isCompleted)
             {
+                this._edi?.Throw();
                 return this._result!;
             }
         }
@@ -99,6 +98,8 @@ internal sealed class FakeTaskState<T>
 
         lock (this._lock)
         {
+            this._edi?.Throw();
+
             return this._result!;
         }
     }

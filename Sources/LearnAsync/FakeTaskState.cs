@@ -80,10 +80,9 @@ internal sealed class FakeTaskState
     {
         lock (this._lock)
         {
-            this._edi?.Throw();
-
             if (this._isCompleted)
             {
+                this._edi?.Throw();
                 return;
             }
         }
@@ -93,6 +92,11 @@ internal sealed class FakeTaskState
         this.AddContinuationAction(e.Set);
 
         e.Wait();
+
+        lock (this._lock)
+        {
+            this._edi?.Throw();
+        }
     }
 
     private void RunContinuations()
