@@ -17,7 +17,7 @@ public readonly struct FakeTask
 
     public FakeTaskAwaiter GetAwaiter()
     {
-        return new();
+        return new(this._state);
     }
 
     internal void SetResult()

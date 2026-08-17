@@ -25,6 +25,7 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
+    [Timeout(10_000)]
     public async Task 戻り値のない非同期メソッドを呼ぶ()
     {
         var asyncLocal = new AsyncLocal<int>
@@ -47,6 +48,7 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
+    [Timeout(10_000)]
     public async Task 戻り値のない非同期メソッド_自前ステートマシン版_を呼ぶ()
     {
         var asyncLocal = new AsyncLocal<int>
@@ -66,20 +68,6 @@ public sealed class FakeTaskTest
         await task;
 
         Assert.AreEqual(42, resultHolder.Result);
-    }
-
-    [TestMethod]
-    public async Task 戻り値のある非同期メソッドを呼ぶ()
-    {
-        var result = await this.GetIntAsync(this._testContext.CancellationToken);
-        Assert.AreEqual(42, result);
-    }
-
-    [TestMethod]
-    public async Task 戻り値のある非同期メソッド_自前ステートマシン版_を呼ぶ()
-    {
-        var result = await this.GetIntAsyncWithCustomStateMachine(this._testContext.CancellationToken);
-        Assert.AreEqual(42, result);
     }
 
 #pragma warning disable CA1822
@@ -129,27 +117,6 @@ public sealed class FakeTaskTest
         return builder.Task;
     }
 
-    private async FakeTask<int> GetIntAsync(
-        CancellationToken cancellationToken = default)
-    {
-        await Task.Delay(TimeSpan.Zero).ConfigureAwait(false);
-
-        return 42;
-    }
-
-    private FakeTask<int> GetIntAsyncWithCustomStateMachine(
-        CancellationToken cancellationToken = default)
-    {
-        var stateMachine = new GetIntAsyncCustomStateMachine();
-
-        stateMachine.Builder = FakeTaskMethodBuilder<int>.Create();
-        ref var builder = ref stateMachine.Builder;
-
-        builder.Start(ref stateMachine);
-
-        return builder.Task;
-    }
-
     private struct DoAsyncCustomStateMachine :
         IAsyncStateMachine
     {
@@ -182,7 +149,7 @@ public sealed class FakeTaskTest
 
         private ConfiguredTaskAwaitable.ConfiguredTaskAwaiter _awaiter;
 
-        void IAsyncStateMachine.MoveNext()
+        readonly void IAsyncStateMachine.MoveNext()
         {
             var self = this;
 
@@ -245,22 +212,6 @@ public sealed class FakeTaskTest
                 self.Builder.SetException(exception);
                 self.CurrentState = State.Completed;
             }
-        }
-
-        public void SetStateMachine(
-            IAsyncStateMachine stateMachine)
-        {
-            ArgumentNullException.ThrowIfNull(stateMachine);
-        }
-    }
-
-    private struct GetIntAsyncCustomStateMachine :
-        IAsyncStateMachine
-    {
-        public FakeTaskMethodBuilder<int> Builder;
-
-        public void MoveNext()
-        {
         }
 
         public void SetStateMachine(

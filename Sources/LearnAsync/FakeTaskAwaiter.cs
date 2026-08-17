@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 
 namespace LearnAsync;
 
@@ -26,16 +27,26 @@ public readonly struct FakeTaskAwaiter :
         Action continuation)
     {
         ArgumentNullException.ThrowIfNull(continuation);
+
+        var executionContext = ExecutionContext.Capture();
+
+        continuation = executionContext is null
+            ? continuation
+            : () => ExecutionContext.Run(executionContext, state => ((Action)state!)(), continuation);
+
+        this._state.AddContinuationAction(continuation);
     }
 
     void ICriticalNotifyCompletion.UnsafeOnCompleted(
         Action continuation)
     {
         ArgumentNullException.ThrowIfNull(continuation);
+
+        this._state.AddContinuationAction(continuation);
     }
 
     public void GetResult()
     {
-        this._state.Wait();
+        this._state.GetResult();
     }
 }
