@@ -311,14 +311,14 @@ public sealed class FakeTaskOfTTest
             Completed
         }
 
-        public struct NethodParameters
+        public struct MethodParameters
         {
             public TState State;
 
             public Func<TState, Task<TResult>> Action;
         }
 
-        public NethodParameters Parameters;
+        public MethodParameters Parameters;
 
         public State CurrentState { get; set; }
 

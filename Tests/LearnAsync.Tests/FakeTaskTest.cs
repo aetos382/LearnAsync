@@ -275,14 +275,14 @@ public sealed class FakeTaskTest
             Completed
         }
 
-        public struct NethodParameters
+        public struct MethodParameters
         {
             public TState State;
 
             public Func<TState, Task> Action;
         }
 
-        public NethodParameters Parameters;
+        public MethodParameters Parameters;
 
         public State CurrentState { get; set; }
 
