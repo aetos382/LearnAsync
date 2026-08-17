@@ -23,7 +23,7 @@ public sealed class FakeTaskTest
 
     [TestMethod]
     [Timeout(10_000)]
-    public async Task CompleteSynchnously_Await()
+    public async Task 同期的に完了するFakeTaskをawaitする()
     {
         var asyncLocal = new AsyncLocal<int>
         {
@@ -46,8 +46,27 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
+    public async Task 同期的に完了するFakeTaskを複数回awaitする()
+    {
+        var fakeTask = DoAsync(static () => Task.CompletedTask);
+
+        await fakeTask;
+        await fakeTask;
+    }
+
+    [TestMethod]
+    public async Task 例外で同期的に完了するタスクをawaitする()
+    {
+#pragma warning disable CA2201
+        var fakeTask = DoAsync(static () => throw new Exception("Oops!"));
+#pragma warning restore
+
+        await Assert.ThrowsAsync<Exception>(async () => await fakeTask).ConfigureAwait(false);
+    }
+
+    [TestMethod]
     [Timeout(10_000)]
-    public async Task CompleteAsynchnously_Await()
+    public async Task 非同期的に完了するFakeTaskをawaitする()
     {
         var testCancellationToken = this._testContext.CancellationToken;
 
@@ -79,7 +98,7 @@ public sealed class FakeTaskTest
 
     [TestMethod]
     [Timeout(10_000)]
-    public async Task CompleteSynchronously_CustomStateMachine()
+    public async Task 同期的に完了するFakeTaskを自前のステートマシンで回す()
     {
         var asyncLocal = new AsyncLocal<int>
         {
@@ -88,9 +107,7 @@ public sealed class FakeTaskTest
 
         var resultHolder = new ResultHolder();
 
-        var task = RunStateMachine(asyncLocal, resultHolder);
-
-        await task;
+        await RunStateMachine(asyncLocal, resultHolder);
 
         Assert.AreEqual(42, resultHolder.Result);
 
@@ -120,7 +137,38 @@ public sealed class FakeTaskTest
 
     [TestMethod]
     [Timeout(10_000)]
-    public async Task CompleteAsynchronously_CustomStateMachine()
+    public async Task 例外で同期的に完了するFakeTaskを自前のステートマシンで回す()
+    {
+        await Assert.ThrowsAsync<Exception>(static async () => await RunStateMachine()).ConfigureAwait(false);
+
+        static FakeTask RunStateMachine()
+        {
+            var stateMachine = new DoAsyncStateMachine<object?>
+            {
+                Builder = FakeTaskMethodBuilder.Create(),
+                Parameters = new()
+                {
+                    State = null,
+                    Action = static _ =>
+                    {
+#pragma warning disable CA2201
+                        throw new Exception("Oops!");
+#pragma warning restore
+                    }
+                }
+            };
+
+            ref var builder = ref stateMachine.Builder;
+
+            builder.Start(ref stateMachine);
+
+            return builder.Task;
+        }
+    }
+
+    [TestMethod]
+    [Timeout(10_000)]
+    public async Task 非同期的に完了するFakeTaskを自前のステートマシンで回す()
     {
         var testCancellationToken = this._testContext.CancellationToken;
 
@@ -154,6 +202,48 @@ public sealed class FakeTaskTest
                     {
                         await state.Signal.WaitAsync(state.CancellationToken).ConfigureAwait(false);
                         state.Output.SetResult(state.Input.Value);
+                    }
+                }
+            };
+
+            ref var builder = ref stateMachine.Builder;
+
+            builder.Start(ref stateMachine);
+
+            return builder.Task;
+        }
+    }
+
+    [TestMethod]
+    [Timeout(10_000)]
+    public async Task 例外で非同期的に完了するFakeTaskを自前のステートマシンで回す()
+    {
+        var testCancellationToken = this._testContext.CancellationToken;
+
+        var tcs = new TaskCompletionSource();
+
+        var fakeTask = RunStateMachine(tcs.Task, testCancellationToken);
+
+        var task = DelayedSignal(tcs, TimeSpan.FromSeconds(3), testCancellationToken);
+
+        await Assert.ThrowsAsync<Exception>(async () => await fakeTask).ConfigureAwait(false);
+        await tcs.Task.ConfigureAwait(false);
+
+        static FakeTask RunStateMachine(Task signal, CancellationToken cancellationToken)
+        {
+            var stateMachine = new DoAsyncStateMachine<(Task Signal, CancellationToken CancellationToken)>
+            {
+                Builder = FakeTaskMethodBuilder.Create(),
+                Parameters = new()
+                {
+                    State = (signal, cancellationToken),
+                    Action = static async state =>
+                    {
+                        await state.Signal.WaitAsync(state.CancellationToken).ConfigureAwait(false);
+
+#pragma warning disable CA2201
+                        throw new Exception("Oops!");
+#pragma warning restore
                     }
                 }
             };
@@ -285,5 +375,10 @@ public sealed class FakeTaskTest
     private static async FakeTask DoAsync<TState>(TState state, Func<TState, Task> action)
     {
         await action(state).ConfigureAwait(false);
+    }
+
+    private static async FakeTask DoAsync(Func<Task> action)
+    {
+        await action().ConfigureAwait(false);
     }
 }

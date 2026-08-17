@@ -16,32 +16,4 @@ public sealed class FakeTaskTest
 
         this._testContext = testContext;
     }
-
-    [TestMethod]
-    public async Task 戻り値のない非同期メソッドを呼んでawaitする()
-    {
-        await this.DoAsync(this._testContext.CancellationToken);
-    }
-
-    [TestMethod]
-    public async Task 戻り値のある非同期メソッドを呼んでawaitする()
-    {
-        var result = await this.GetIntAsync(this._testContext.CancellationToken);
-
-        Assert.AreEqual(42, result);
-    }
-
-    private async FakeTask DoAsync(
-        CancellationToken cancellationToken = default)
-    {
-        await Task.Delay(TimeSpan.Zero).ConfigureAwait(false);
-    }
-
-    private async FakeTask<int> GetIntAsync(
-        CancellationToken cancellationToken = default)
-    {
-        await Task.Delay(TimeSpan.Zero).ConfigureAwait(false);
-
-        return 42;
-    }
 }

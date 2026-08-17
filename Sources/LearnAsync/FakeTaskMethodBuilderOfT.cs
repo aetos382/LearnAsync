@@ -1,19 +1,18 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Threading;
+using System.Text;
 
 namespace LearnAsync;
 
 #pragma warning disable CA1815
 
-public struct FakeTaskMethodBuilder<T>
+public readonly struct FakeTaskMethodBuilder<T>
 {
-#pragma warning disable CA1000
     public static FakeTaskMethodBuilder<T> Create()
     {
         return new();
     }
-#pragma warning restore
 
     public FakeTaskMethodBuilder()
     {
@@ -44,6 +43,8 @@ public struct FakeTaskMethodBuilder<T>
     {
         ArgumentNullException.ThrowIfNull(awaiter);
         ArgumentNullException.ThrowIfNull(stateMachine);
+
+        awaiter.OnCompleted(stateMachine.MoveNext);
     }
 
     public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(
@@ -54,15 +55,20 @@ public struct FakeTaskMethodBuilder<T>
     {
         ArgumentNullException.ThrowIfNull(awaiter);
         ArgumentNullException.ThrowIfNull(stateMachine);
+
+        awaiter.UnsafeOnCompleted(stateMachine.MoveNext);
     }
 
     public void SetResult(T result)
     {
+        this.Task.SetResult(result);
     }
 
     public void SetException(
         Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
+
+        this.Task.SetException(exception);
     }
 }

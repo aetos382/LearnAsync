@@ -14,7 +14,7 @@ internal sealed class FakeTaskState
 
     public bool IsCompleted { get; private set; }
 
-    private Exception? _exception;
+    private ExceptionDispatchInfo? _edi;
 
     private readonly ConcurrentQueue<Action> _completedActions = new();
 
@@ -47,9 +47,9 @@ internal sealed class FakeTaskState
             throw new InvalidOperationException("task already completed.");
         }
 
-        Debug.Assert(this._exception is null);
+        Debug.Assert(this._edi is null);
 
-        this._exception = exception;
+        this._edi = ExceptionDispatchInfo.Capture(exception);
 
         this.IsCompleted = true;
 
@@ -58,15 +58,9 @@ internal sealed class FakeTaskState
 
     public void GetResult()
     {
-        if (this._exception is { } exception)
-        {
-            ExceptionDispatchInfo.Throw(exception);
-        }
-        else if (this.IsCompleted)
-        {
-            return;
-        }
-        else
+        this._edi?.Throw();
+
+        if (!this.IsCompleted)
         {
             using var e = new ManualResetEventSlim(false);
 
