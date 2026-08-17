@@ -67,6 +67,24 @@ public sealed class FakeTaskOfTTest
 
     [TestMethod]
     [Timeout(10_000)]
+    public void 完了済みのFakeTaskOfTに登録した継続はその場で実行される()
+    {
+        var fakeTask = DoAsync(static () => Task.FromResult(42));
+
+        var awaiter = fakeTask.GetAwaiter();
+
+        Assert.IsTrue(awaiter.IsCompleted);
+
+        var ran = false;
+
+        ((ICriticalNotifyCompletion)awaiter).UnsafeOnCompleted(() => ran = true);
+
+        Assert.IsTrue(ran);
+        Assert.AreEqual(42, awaiter.GetResult());
+    }
+
+    [TestMethod]
+    [Timeout(10_000)]
     public async Task 例外で同期的に完了するFakeTaskOfTをawaitする()
     {
         var fakeTask = DoAsync<int>(

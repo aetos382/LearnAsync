@@ -1,40 +1,61 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
-using System.Text;
 using System.Threading;
 
 namespace LearnAsync;
 
 internal sealed class FakeTaskState
 {
-    private bool _gate;
+    private readonly Lock _lock = new();
 
-    public bool IsCompleted { get; private set; }
+    private bool _isCompleted;
 
     private ExceptionDispatchInfo? _edi;
 
-    private readonly ConcurrentQueue<Action> _completedActions = new();
+    private readonly Queue<Action> _continuations = new();
+
+    public bool IsCompleted
+    {
+        get
+        {
+            lock (this._lock)
+            {
+                return this._isCompleted;
+            }
+        }
+    }
 
     internal void AddContinuationAction(Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        this._completedActions.Enqueue(action);
+        lock (this._lock)
+        {
+            if (!this._isCompleted)
+            {
+                this._continuations.Enqueue(action);
+                return;
+            }
+        }
+
+        action();
     }
 
     public void SetResult()
     {
-        if (Interlocked.Exchange(ref this._gate, true))
+        lock (this._lock)
         {
-            throw new InvalidOperationException("task already completed.");
+            if (this._isCompleted)
+            {
+                throw new InvalidOperationException("task already completed.");
+            }
+
+            this._isCompleted = true;
         }
 
-        this.IsCompleted = true;
-
-        this.WakeWaiters();
+        this.RunContinuations();
     }
 
     public void SetException(
@@ -42,38 +63,53 @@ internal sealed class FakeTaskState
     {
         ArgumentNullException.ThrowIfNull(exception);
 
-        if (Interlocked.Exchange(ref this._gate, true))
+        lock (this._lock)
         {
-            throw new InvalidOperationException("task already completed.");
+            if (this._isCompleted)
+            {
+                throw new InvalidOperationException("task already completed.");
+            }
+
+            this._edi = ExceptionDispatchInfo.Capture(exception);
+            this._isCompleted = true;
         }
 
-        Debug.Assert(this._edi is null);
-
-        this._edi = ExceptionDispatchInfo.Capture(exception);
-
-        this.IsCompleted = true;
-
-        this.WakeWaiters();
+        this.RunContinuations();
     }
 
     public void GetResult()
     {
-        this._edi?.Throw();
-
-        if (!this.IsCompleted)
+        lock (this._lock)
         {
-            using var e = new ManualResetEventSlim(false);
+            this._edi?.Throw();
 
-            this.AddContinuationAction(e.Set);
-
-            e.Wait();
+            if (this._isCompleted)
+            {
+                return;
+            }
         }
+
+        using var e = new ManualResetEventSlim(false);
+
+        this.AddContinuationAction(e.Set);
+
+        e.Wait();
     }
 
-    private void WakeWaiters()
+    private void RunContinuations()
     {
-        while (this._completedActions.TryDequeue(out var action))
+        while (true)
         {
+            Action? action;
+
+            lock (this._lock)
+            {
+                if (!this._continuations.TryDequeue(out action))
+                {
+                    return;
+                }
+            }
+
             action();
         }
     }

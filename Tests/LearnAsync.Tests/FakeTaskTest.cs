@@ -55,6 +55,23 @@ public sealed class FakeTaskTest
     }
 
     [TestMethod]
+    [Timeout(10_000)]
+    public void 完了済みのFakeTaskに登録した継続はその場で実行される()
+    {
+        var fakeTask = DoAsync(static () => Task.CompletedTask);
+
+        var awaiter = fakeTask.GetAwaiter();
+
+        Assert.IsTrue(awaiter.IsCompleted);
+
+        var ran = false;
+
+        ((ICriticalNotifyCompletion)awaiter).UnsafeOnCompleted(() => ran = true);
+
+        Assert.IsTrue(ran);
+    }
+
+    [TestMethod]
     public async Task 例外で同期的に完了するタスクをawaitする()
     {
 #pragma warning disable CA2201
