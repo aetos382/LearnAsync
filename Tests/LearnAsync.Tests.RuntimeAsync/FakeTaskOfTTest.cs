@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -511,6 +512,107 @@ public sealed class FakeTaskOfTTest
         }
     }
 
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public async Task 二回目以降の中断ではステートマシンの箱が作り直されない()
+    {
+        var first = new TaskCompletionSource();
+        var second = new TaskCompletionSource();
+        var suspended = new TaskCompletionSource();
+
+        var boxes = new List<IAsyncStateMachine>();
+
+        var stateMachine = new TwoSuspensionStateMachine
+        {
+            Builder = FakeTaskMethodBuilder<int>.Create(),
+            First = first.Task,
+            Second = second.Task,
+            Suspended = suspended,
+            Boxes = boxes
+        };
+
+        stateMachine.Builder.Start(ref stateMachine);
+
+        var fakeTask = stateMachine.Builder.Task;
+
+        first.SetResult();
+
+        await suspended.Task.ConfigureAwait(false);
+
+        second.SetResult();
+
+        Assert.AreEqual(42, await fakeTask);
+        Assert.AreEqual(1, boxes.Count);
+    }
+
+    private struct TwoSuspensionStateMachine :
+        IAsyncStateMachine
+    {
+        public FakeTaskMethodBuilder<int> Builder;
+
+        public Task First;
+
+        public Task Second;
+
+        public TaskCompletionSource Suspended;
+
+        public List<IAsyncStateMachine> Boxes;
+
+        private int _stage;
+
+        private int _marker;
+
+        private ConfiguredTaskAwaitable.ConfiguredTaskAwaiter _awaiter;
+
+        void IAsyncStateMachine.MoveNext()
+        {
+            try
+            {
+                switch (this._stage)
+                {
+                    case 0:
+                        this._awaiter = this.First.ConfigureAwait(false).GetAwaiter();
+                        this._stage = 1;
+                        this.Builder.AwaitUnsafeOnCompleted(ref this._awaiter, ref this);
+                        break;
+
+                    case 1:
+                        this._awaiter.GetResult();
+                        this._awaiter = this.Second.ConfigureAwait(false).GetAwaiter();
+                        this._stage = 2;
+                        this.Builder.AwaitUnsafeOnCompleted(ref this._awaiter, ref this);
+
+                        // 箱を作り直していると、この書き込みは継続が走る箱に届かない。
+                        this._marker = 42;
+                        this.Suspended.SetResult();
+                        break;
+
+                    case 2:
+                        this._awaiter.GetResult();
+                        this._stage = 3;
+                        this.Builder.SetResult(this._marker);
+                        break;
+
+                    default:
+                        throw new InvalidOperationException();
+                }
+            }
+#pragma warning disable CA1031
+            catch (Exception exception)
+            {
+                this.Builder.SetException(exception);
+            }
+#pragma warning restore
+        }
+
+        public readonly void SetStateMachine(
+            IAsyncStateMachine stateMachine)
+        {
+            this.Boxes.Add(stateMachine);
+            this.Builder.SetStateMachine(stateMachine);
+        }
+    }
+
     private struct DoAsyncStateMachine<TState, TResult> :
         IAsyncStateMachine
     {
@@ -604,7 +706,7 @@ public sealed class FakeTaskOfTTest
         public readonly void SetStateMachine(
             IAsyncStateMachine stateMachine)
         {
-            ArgumentNullException.ThrowIfNull(stateMachine);
+            this.Builder.SetStateMachine(stateMachine);
         }
     }
 

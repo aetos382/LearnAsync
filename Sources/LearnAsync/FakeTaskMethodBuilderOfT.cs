@@ -8,6 +8,8 @@ namespace LearnAsync;
 
 public readonly struct FakeTaskMethodBuilder<T>
 {
+    private readonly FakeTaskState<T> _state = new();
+
 #pragma warning disable CA1000
     public static FakeTaskMethodBuilder<T> Create()
     {
@@ -19,7 +21,7 @@ public readonly struct FakeTaskMethodBuilder<T>
     {
     }
 
-    public FakeTask<T> Task { get; } = new();
+    public FakeTask<T> Task => new(this._state);
 
     public void Start<TStateMachine>(
         ref TStateMachine stateMachine)
@@ -47,6 +49,8 @@ public readonly struct FakeTaskMethodBuilder<T>
         IAsyncStateMachine stateMachine)
     {
         ArgumentNullException.ThrowIfNull(stateMachine);
+
+        this._state.SetStateMachine(stateMachine);
     }
 
     public void AwaitOnCompleted<TAwaiter, TStateMachine>(
@@ -55,7 +59,7 @@ public readonly struct FakeTaskMethodBuilder<T>
         where TAwaiter : INotifyCompletion
         where TStateMachine : IAsyncStateMachine
     {
-        awaiter.OnCompleted(CreateContinuation(ref stateMachine));
+        awaiter.OnCompleted(this.CreateContinuation(ref stateMachine));
     }
 
     public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(
@@ -64,12 +68,12 @@ public readonly struct FakeTaskMethodBuilder<T>
         where TAwaiter : ICriticalNotifyCompletion
         where TStateMachine : IAsyncStateMachine
     {
-        awaiter.UnsafeOnCompleted(CreateContinuation(ref stateMachine));
+        awaiter.UnsafeOnCompleted(this.CreateContinuation(ref stateMachine));
     }
 
     public void SetResult(T result)
     {
-        this.Task.SetResult(result);
+        this._state.SetResult(result);
     }
 
     public void SetException(
@@ -77,16 +81,21 @@ public readonly struct FakeTaskMethodBuilder<T>
     {
         ArgumentNullException.ThrowIfNull(exception);
 
-        this.Task.SetException(exception);
+        this._state.SetException(exception);
     }
 
-    private static Action CreateContinuation<TStateMachine>(
+    private Action CreateContinuation<TStateMachine>(
         ref TStateMachine stateMachine)
         where TStateMachine : IAsyncStateMachine
     {
-        IAsyncStateMachine boxedStateMachine = stateMachine;
+        if (this._state.StateMachine is not { } boxedStateMachine)
+        {
+            boxedStateMachine = stateMachine;
+            boxedStateMachine.SetStateMachine(boxedStateMachine);
+        }
 
         var context = ExecutionContext.Capture();
+
         if (context is null)
         {
             return boxedStateMachine.MoveNext;

@@ -8,6 +8,8 @@ namespace LearnAsync;
 
 public readonly struct FakeTaskMethodBuilder
 {
+    private readonly FakeTaskState _state = new();
+
     public static FakeTaskMethodBuilder Create()
     {
         return new();
@@ -17,7 +19,7 @@ public readonly struct FakeTaskMethodBuilder
     {
     }
 
-    public FakeTask Task { get; } = new();
+    public FakeTask Task => new(this._state);
 
 #pragma warning disable CA1822
     public void Start<TStateMachine>(
@@ -41,11 +43,14 @@ public readonly struct FakeTaskMethodBuilder
             }
         }
     }
+#pragma warning restore
 
     public void SetStateMachine(
         IAsyncStateMachine stateMachine)
     {
         ArgumentNullException.ThrowIfNull(stateMachine);
+
+        this._state.SetStateMachine(stateMachine);
     }
 
     public void AwaitOnCompleted<TAwaiter, TStateMachine>(
@@ -54,7 +59,7 @@ public readonly struct FakeTaskMethodBuilder
         where TAwaiter : INotifyCompletion
         where TStateMachine : IAsyncStateMachine
     {
-        awaiter.OnCompleted(CreateContinuation(ref stateMachine));
+        awaiter.OnCompleted(this.CreateContinuation(ref stateMachine));
     }
 
     public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(
@@ -63,13 +68,12 @@ public readonly struct FakeTaskMethodBuilder
         where TAwaiter : ICriticalNotifyCompletion
         where TStateMachine : IAsyncStateMachine
     {
-        awaiter.UnsafeOnCompleted(CreateContinuation(ref stateMachine));
+        awaiter.UnsafeOnCompleted(this.CreateContinuation(ref stateMachine));
     }
-#pragma warning restore
 
     public void SetResult()
     {
-        this.Task.SetResult();
+        this._state.SetResult();
     }
 
     public void SetException(
@@ -77,16 +81,21 @@ public readonly struct FakeTaskMethodBuilder
     {
         ArgumentNullException.ThrowIfNull(exception);
 
-        this.Task.SetException(exception);
+        this._state.SetException(exception);
     }
 
-    private static Action CreateContinuation<TStateMachine>(
+    private Action CreateContinuation<TStateMachine>(
         ref TStateMachine stateMachine)
         where TStateMachine : IAsyncStateMachine
     {
-        IAsyncStateMachine boxedStateMachine = stateMachine;
+        if (this._state.StateMachine is not { } boxedStateMachine)
+        {
+            boxedStateMachine = stateMachine;
+            boxedStateMachine.SetStateMachine(boxedStateMachine);
+        }
 
         var context = ExecutionContext.Capture();
+
         if (context is null)
         {
             return boxedStateMachine.MoveNext;

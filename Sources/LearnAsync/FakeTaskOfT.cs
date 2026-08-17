@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.CompilerServices;
 
 namespace LearnAsync;
@@ -15,20 +14,14 @@ public readonly struct FakeTask<T>
         this._state = new();
     }
 
+    internal FakeTask(
+        FakeTaskState<T> state)
+    {
+        this._state = state;
+    }
+
     public FakeTaskAwaiter<T> GetAwaiter()
     {
         return new(this._state);
-    }
-
-    internal void SetResult(T result)
-    {
-        this._state.SetResult(result);
-    }
-
-    internal void SetException(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-
-        this._state.SetException(exception);
     }
 }

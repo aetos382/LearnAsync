@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 
@@ -13,7 +14,19 @@ internal sealed class FakeTaskState
 
     private ExceptionDispatchInfo? _edi;
 
+    private IAsyncStateMachine? _stateMachine;
+
     private readonly Queue<Action> _continuations = new();
+
+    internal IAsyncStateMachine? StateMachine => Volatile.Read(ref this._stateMachine);
+
+    internal void SetStateMachine(
+        IAsyncStateMachine stateMachine)
+    {
+        ArgumentNullException.ThrowIfNull(stateMachine);
+
+        Volatile.Write(ref this._stateMachine, stateMachine);
+    }
 
     public bool IsCompleted
     {
