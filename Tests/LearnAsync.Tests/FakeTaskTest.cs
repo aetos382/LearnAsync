@@ -4,6 +4,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Microsoft.VisualStudio.TestPlatform.Utilities;
+
 namespace LearnAsync.Tests;
 
 [TestClass]
@@ -19,14 +21,9 @@ public sealed class FakeTaskTest
         this._testContext = testContext;
     }
 
-    private class ResultHolder
-    {
-        public int Result;
-    }
-
     [TestMethod]
     [Timeout(10_000)]
-    public async Task 戻り値のない非同期メソッドを呼ぶ()
+    public async Task CompleteSynchnously_Await()
     {
         var asyncLocal = new AsyncLocal<int>
         {
@@ -35,92 +32,144 @@ public sealed class FakeTaskTest
 
         var resultHolder = new ResultHolder();
 
-        var tcs = new TaskCompletionSource();
-
-        var task = this.DoAsync(asyncLocal, resultHolder, tcs.Task, this._testContext.CancellationToken);
-
-        tcs.SetResult();
-
-        await tcs.Task.ConfigureAwait(false);
-        await task;
-
-        Assert.AreEqual(42, resultHolder.Result);
-    }
-
-    [TestMethod]
-    [Timeout(10_000)]
-    public async Task 戻り値のない非同期メソッド_自前ステートマシン版_を呼ぶ()
-    {
-        var asyncLocal = new AsyncLocal<int>
-        {
-            Value = 42
-        };
-
-        var resultHolder = new ResultHolder();
-
-        var tcs = new TaskCompletionSource();
-
-        var task = this.DoAsyncWithCustomStateMachine(asyncLocal, resultHolder, tcs.Task, this._testContext.CancellationToken);
-
-        tcs.SetResult();
-
-        await tcs.Task.ConfigureAwait(false);
-        await task;
-
-        Assert.AreEqual(42, resultHolder.Result);
-    }
-
-#pragma warning disable CA1822
-    private async Task WaitAsync(
-        Task signal,
-        CancellationToken cancellationToken)
-    {
-        await signal.WaitAsync(cancellationToken).ConfigureAwait(false);
-    }
-#pragma warning restore
-
-    private async FakeTask DoAsync(
-        AsyncLocal<int> asyncLocal,
-        ResultHolder resultHolder,
-        Task signal,
-        CancellationToken cancellationToken = default)
-    {
-        await this.WaitAsync(signal, cancellationToken).ConfigureAwait(false);
-
-        resultHolder.Result = asyncLocal.Value;
-    }
-
-    private FakeTask DoAsyncWithCustomStateMachine(
-        AsyncLocal<int> asyncLocal,
-        ResultHolder resultHolder,
-        Task task,
-        CancellationToken cancellationToken = default)
-    {
-        var stateMachine = new DoAsyncCustomStateMachine
-        {
-            Builder = FakeTaskMethodBuilder.Create(),
-            CurrentState = DoAsyncCustomStateMachine.State.NotStarted,
-            Parameters = new()
+        var fakeTask = DoAsync(
+            (Input: asyncLocal, Output: resultHolder),
+            static state =>
             {
-                This = this,
-                AsyncLocal = asyncLocal,
-                ResultHolder = resultHolder,
-                Task = task,
-                CancellationToken = cancellationToken
-            }
-        };
+                state.Output.SetResult(state.Input.Value);
+                return Task.CompletedTask;
+            });
 
-        ref var builder = ref stateMachine.Builder;
+        await fakeTask;
 
-        builder.Start(ref stateMachine);
-
-        return builder.Task;
+        Assert.AreEqual(42, resultHolder.Result);
     }
 
-    private struct DoAsyncCustomStateMachine :
+    [TestMethod]
+    [Timeout(10_000)]
+    public async Task CompleteAsynchnously_Await()
+    {
+        var testCancellationToken = this._testContext.CancellationToken;
+
+        var asyncLocal = new AsyncLocal<int>
+        {
+            Value = 42
+        };
+
+        var resultHolder = new ResultHolder();
+
+        var tcs = new TaskCompletionSource();
+
+        var fakeTask = DoAsync(
+            (Input: asyncLocal, Output: resultHolder, Signal: tcs.Task, CancellationToken: testCancellationToken),
+            static async state =>
+            {
+                await state.Signal.WaitAsync(state.CancellationToken).ConfigureAwait(false);
+
+                state.Output.SetResult(state.Input.Value);
+            });
+
+        var task = DelayedSignal(tcs, TimeSpan.FromSeconds(3), testCancellationToken);
+
+        await fakeTask;
+        await tcs.Task.ConfigureAwait(false);
+
+        Assert.AreEqual(42, resultHolder.Result);
+    }
+
+    [TestMethod]
+    [Timeout(10_000)]
+    public async Task CompleteSynchronously_CustomStateMachine()
+    {
+        var asyncLocal = new AsyncLocal<int>
+        {
+            Value = 42
+        };
+
+        var resultHolder = new ResultHolder();
+
+        var task = RunStateMachine(asyncLocal, resultHolder);
+
+        await task;
+
+        Assert.AreEqual(42, resultHolder.Result);
+
+        static FakeTask RunStateMachine(AsyncLocal<int> input, ResultHolder output)
+        {
+            var stateMachine = new DoAsyncStateMachine<(AsyncLocal<int> Input, ResultHolder Output)>
+            {
+                Builder = FakeTaskMethodBuilder.Create(),
+                Parameters = new()
+                {
+                    State = (input, output),
+                    Action = static state =>
+                    {
+                        state.Output.SetResult(state.Input.Value);
+                        return Task.CompletedTask;
+                    }
+                }
+            };
+
+            ref var builder = ref stateMachine.Builder;
+
+            builder.Start(ref stateMachine);
+
+            return builder.Task;
+        }
+    }
+
+    [TestMethod]
+    [Timeout(10_000)]
+    public async Task CompleteAsynchronously_CustomStateMachine()
+    {
+        var testCancellationToken = this._testContext.CancellationToken;
+
+        var asyncLocal = new AsyncLocal<int>
+        {
+            Value = 42
+        };
+
+        var resultHolder = new ResultHolder();
+
+        var tcs = new TaskCompletionSource();
+
+        var fakeTask = RunStateMachine(asyncLocal, resultHolder, tcs.Task, testCancellationToken);
+
+        var task = DelayedSignal(tcs, TimeSpan.FromSeconds(3), testCancellationToken);
+
+        await fakeTask;
+        await tcs.Task.ConfigureAwait(false);
+
+        Assert.AreEqual(42, resultHolder.Result);
+
+        static FakeTask RunStateMachine(AsyncLocal<int> input, ResultHolder output, Task signal, CancellationToken cancellationToken)
+        {
+            var stateMachine = new DoAsyncStateMachine<(AsyncLocal<int> Input, ResultHolder Output, Task Signal, CancellationToken CancellationToken)>
+            {
+                Builder = FakeTaskMethodBuilder.Create(),
+                Parameters = new()
+                {
+                    State = (input, output, signal, cancellationToken),
+                    Action = static async state =>
+                    {
+                        await state.Signal.WaitAsync(state.CancellationToken).ConfigureAwait(false);
+                        state.Output.SetResult(state.Input.Value);
+                    }
+                }
+            };
+
+            ref var builder = ref stateMachine.Builder;
+
+            builder.Start(ref stateMachine);
+
+            return builder.Task;
+        }
+    }
+
+    private struct DoAsyncStateMachine<TState> :
         IAsyncStateMachine
     {
-        public DoAsyncCustomStateMachine()
+        public DoAsyncStateMachine()
         {
             this.CurrentState = State.NotStarted;
         }
@@ -136,11 +185,9 @@ public sealed class FakeTaskTest
 
         public struct NethodParameters
         {
-            public FakeTaskTest This;
-            public AsyncLocal<int> AsyncLocal;
-            public ResultHolder ResultHolder;
-            public Task Task;
-            public CancellationToken CancellationToken;
+            public TState State;
+
+            public Func<TState, Task> Action;
         }
 
         public NethodParameters Parameters;
@@ -151,18 +198,16 @@ public sealed class FakeTaskTest
 
         readonly void IAsyncStateMachine.MoveNext()
         {
-            var self = this;
-
             try
             {
                 switch (this.CurrentState)
                 {
                     case State.NotStarted:
-                        Stage1();
+                        Stage1(this);
                         break;
 
                     case State.Stage1Completed:
-                        Stage2();
+                        Stage2(this);
                         break;
 
                     case State.Completed:
@@ -175,13 +220,13 @@ public sealed class FakeTaskTest
 #pragma warning disable CA1031
             catch (Exception exception)
             {
-                SetException(exception);
+                SetException(this, exception);
             }
 #pragma warning restore
 
-            void Stage1()
+            static void Stage1(DoAsyncStateMachine<TState> self)
             {
-                var awaiter = self.Parameters.This.WaitAsync(self.Parameters.Task, self.Parameters.CancellationToken).ConfigureAwait(false).GetAwaiter();
+                var awaiter = self.Parameters.Action(self.Parameters.State).ConfigureAwait(false).GetAwaiter();
 
                 if (awaiter.IsCompleted)
                 {
@@ -197,27 +242,48 @@ public sealed class FakeTaskTest
                 }
             }
 
-            void Stage2()
+            static void Stage2(DoAsyncStateMachine<TState> self)
             {
                 self._awaiter.GetResult();
-
-                self.Parameters.ResultHolder.Result = self.Parameters.AsyncLocal.Value;
-
                 self.Builder.SetResult();
                 self.CurrentState = State.Completed;
             }
 
-            void SetException(Exception exception)
+            static void SetException(DoAsyncStateMachine<TState> self, Exception exception)
             {
                 self.Builder.SetException(exception);
                 self.CurrentState = State.Completed;
             }
         }
 
-        public void SetStateMachine(
+        public readonly void SetStateMachine(
             IAsyncStateMachine stateMachine)
         {
             ArgumentNullException.ThrowIfNull(stateMachine);
         }
+    }
+
+    private class ResultHolder
+    {
+        public int Result { get; private set; }
+
+        public void SetResult(int value)
+        {
+            this.Result = value;
+        }
+    }
+
+    private static async Task DelayedSignal(
+        TaskCompletionSource tcs,
+        TimeSpan delay,
+        CancellationToken cancellationToken)
+    {
+        await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+        tcs.TrySetResult();
+    }
+
+    private static async FakeTask DoAsync<TState>(TState state, Func<TState, Task> action)
+    {
+        await action(state).ConfigureAwait(false);
     }
 }

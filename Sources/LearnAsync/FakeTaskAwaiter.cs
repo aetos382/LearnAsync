@@ -29,10 +29,10 @@ public readonly struct FakeTaskAwaiter :
         ArgumentNullException.ThrowIfNull(continuation);
 
         var executionContext = ExecutionContext.Capture();
-
-        continuation = executionContext is null
-            ? continuation
-            : () => ExecutionContext.Run(executionContext, state => ((Action)state!)(), continuation);
+        if (executionContext is not null)
+        {
+            continuation = () => ExecutionContext.Run(executionContext, state => ((Action)state!)(), continuation);
+        }
 
         this._state.AddContinuationAction(continuation);
     }
