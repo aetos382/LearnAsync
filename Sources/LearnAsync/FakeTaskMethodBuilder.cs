@@ -7,8 +7,6 @@ namespace LearnAsync;
 
 #pragma warning disable CA1815
 
-// メンバーはコンパイラが生成したステート マシンから呼ばれるので、
-// 未使用と見なされないように型ごと PublicAPI としてマークする。
 [PublicAPI]
 public readonly struct FakeTaskMethodBuilder
 {
