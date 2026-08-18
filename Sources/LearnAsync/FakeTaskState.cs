@@ -41,7 +41,7 @@ internal sealed class FakeTaskState<T>
 
     private IAsyncStateMachine? _stateMachine;
 
-    private readonly Queue<Action> _continuations = new();
+    private readonly List<Action> _continuations = new();
 
     internal IAsyncStateMachine? StateMachine
     {
@@ -77,7 +77,7 @@ internal sealed class FakeTaskState<T>
         {
             if (this._status != FakeTaskStatus.Completed)
             {
-                this._continuations.Enqueue(action);
+                this._continuations.Add(action);
                 return;
             }
         }
@@ -139,17 +139,14 @@ internal sealed class FakeTaskState<T>
     // IsCompleted = true が外部から観測できるようになる。
     private void CompleteAndRunContinuations()
     {
-        Action[] actions;
-
         lock (this._lock)
         {
+            // volatile なので _status を書くのに lock が要るわけではない。
+            // AddContinuationAction の実行中に CompleteAndRunContinuations が割り込まないための lock。
             this._status = FakeTaskStatus.Completed;
-
-            actions = this._continuations.ToArray();
-            this._continuations.Clear();
         }
 
-        foreach (var action in actions)
+        foreach (var action in this._continuations)
         {
             try
             {
