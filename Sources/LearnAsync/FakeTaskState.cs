@@ -93,6 +93,8 @@ internal sealed class FakeTaskState<T>
     public void SetException(
         Exception exception)
     {
+        ArgumentNullException.ThrowIfNull(exception);
+
         this.Complete(exception);
     }
 
