@@ -120,8 +120,7 @@ internal sealed class FakeTaskState<T>
 
         this._result = result;
 
-        this.PublishCompletion();
-        this.RunContinuations();
+        this.CompleteAndRunContinuations();
     }
 
     // 完了準備に入る。SetResult と SetException のどちらか一方しか成功させない。
@@ -136,18 +135,16 @@ internal sealed class FakeTaskState<T>
         }
     }
 
-    // 完了状態にする。IsCompleted = true が外部から観測できるようになる。
-    private void PublishCompletion()
-    {
-        this._status = FakeTaskStatus.Completed;
-    }
-
-    private void RunContinuations()
+    // 完了状態にして継続を発火させる。
+    // IsCompleted = true が外部から観測できるようになる。
+    private void CompleteAndRunContinuations()
     {
         Action[] actions;
 
         lock (this._lock)
         {
+            this._status = FakeTaskStatus.Completed;
+
             actions = this._continuations.ToArray();
             this._continuations.Clear();
         }
