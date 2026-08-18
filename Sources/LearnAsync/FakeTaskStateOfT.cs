@@ -101,6 +101,7 @@ internal sealed class FakeTaskState<T>
             if (this._isCompleted)
             {
                 this._edi?.Throw();
+
                 return this._result!;
             }
         }
