@@ -9,11 +9,6 @@ public readonly struct FakeTask<T>
 {
     private readonly FakeTaskState<T> _state;
 
-    public FakeTask()
-    {
-        this._state = new();
-    }
-
     internal FakeTask(
         FakeTaskState<T> state)
     {

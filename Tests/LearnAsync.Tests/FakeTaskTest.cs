@@ -103,7 +103,7 @@ public sealed class FakeTaskTest
         {
             asyncLocal.Value = 42;
 
-            await Task.CompletedTask.ConfigureAwait(false);
+            await Task.Yield();
         }
     }
 
@@ -175,7 +175,7 @@ public sealed class FakeTaskTest
 
     [TestMethod]
     [Timeout(10_000, CooperativeCancellation = true)]
-    public async Task 例外で同期的に完了するタスクをawaitする()
+    public async Task 例外で同期的に完了するFakeTaskをawaitする()
     {
 #pragma warning disable CA2201
         var fakeTask = DoAsync(static () => throw new Exception("Oops!"));
@@ -203,10 +203,11 @@ public sealed class FakeTaskTest
                 state.Output.SetResult(state.Input);
             });
 
-        var task = DelayedSignal(tcs, TimeSpan.FromSeconds(3), testCancellationToken);
+        var awaited = AwaitAsync(fakeTask);
 
-        await fakeTask;
-        await tcs.Task.ConfigureAwait(false);
+        tcs.SetResult();
+
+        await awaited.ConfigureAwait(false);
 
         Assert.AreEqual(42, resultHolder.Result);
     }
@@ -240,7 +241,7 @@ public sealed class FakeTaskTest
             }
         }
 
-        FakeTask.UnobservedContinuationException += Handler;
+        FakeTaskEvents.UnobservedContinuationException += Handler;
 
         try
         {
@@ -258,7 +259,7 @@ public sealed class FakeTaskTest
         }
         finally
         {
-            FakeTask.UnobservedContinuationException -= Handler;
+            FakeTaskEvents.UnobservedContinuationException -= Handler;
         }
     }
 
@@ -385,10 +386,11 @@ public sealed class FakeTaskTest
 
         var fakeTask = RunStateMachine(42, resultHolder, tcs.Task, testCancellationToken);
 
-        var task = DelayedSignal(tcs, TimeSpan.FromSeconds(3), testCancellationToken);
+        var awaited = AwaitAsync(fakeTask);
 
-        await fakeTask;
-        await tcs.Task.ConfigureAwait(false);
+        tcs.SetResult();
+
+        await awaited.ConfigureAwait(false);
 
         Assert.AreEqual(42, resultHolder.Result);
 
@@ -453,10 +455,11 @@ public sealed class FakeTaskTest
 
         var fakeTask = RunStateMachine(tcs.Task, testCancellationToken);
 
-        var task = DelayedSignal(tcs, TimeSpan.FromSeconds(3), testCancellationToken);
+        var awaited = AwaitAsync(fakeTask);
 
-        await Assert.ThrowsAsync<Exception>(async () => await fakeTask, "Oops!").ConfigureAwait(false);
-        await tcs.Task.ConfigureAwait(false);
+        tcs.SetResult();
+
+        await Assert.ThrowsAsync<Exception>(() => awaited, "Oops!").ConfigureAwait(false);
 
         static FakeTask RunStateMachine(Task signal, CancellationToken cancellationToken)
         {
@@ -549,6 +552,34 @@ public sealed class FakeTaskTest
         await fakeTask;
 
         Assert.AreEqual(0, resultHolder.Result);
+    }
+
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public void SetResultで完了したFakeTaskMethodBuilderは再度完了させられない()
+    {
+        var builder = FakeTaskMethodBuilder.Create();
+
+        builder.SetResult();
+
+#pragma warning disable CA2201
+        Assert.ThrowsExactly<InvalidOperationException>(builder.SetResult);
+        Assert.ThrowsExactly<InvalidOperationException>(() => builder.SetException(new Exception("Oops!")));
+#pragma warning restore
+    }
+
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public void SetExceptionで完了したFakeTaskMethodBuilderは再度完了させられない()
+    {
+        var builder = FakeTaskMethodBuilder.Create();
+
+#pragma warning disable CA2201
+        builder.SetException(new Exception("Oops!"));
+
+        Assert.ThrowsExactly<InvalidOperationException>(builder.SetResult);
+        Assert.ThrowsExactly<InvalidOperationException>(() => builder.SetException(new Exception("Oops!")));
+#pragma warning restore
     }
 
     private struct OnCompletedStateMachine<TAwaiter> :
@@ -749,13 +780,11 @@ public sealed class FakeTaskTest
         }
     }
 
-    private static async Task DelayedSignal(
-        TaskCompletionSource tcs,
-        TimeSpan delay,
-        CancellationToken cancellationToken)
+    // 未完了の FakeTask を await して中断する。呼び出しから戻った時点で継続の登録は完了している。
+    private static async Task AwaitAsync(
+        FakeTask fakeTask)
     {
-        await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-        tcs.TrySetResult();
+        await fakeTask;
     }
 
     private static async FakeTask DoAsync<TState>(TState state, Func<TState, Task> action)

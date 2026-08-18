@@ -212,10 +212,11 @@ public sealed class FakeTaskOfTTest
                 return state.Input;
             });
 
-        var task = DelayedSignal(tcs, TimeSpan.FromSeconds(3), testCancellationToken);
+        var awaited = AwaitAsync(fakeTask);
 
-        var result = await fakeTask;
-        await tcs.Task.ConfigureAwait(false);
+        tcs.SetResult();
+
+        var result = await awaited.ConfigureAwait(false);
 
         Assert.AreEqual(42, result);
     }
@@ -237,12 +238,12 @@ public sealed class FakeTaskOfTTest
                 return state.Input;
             });
 
-        var task = DelayedSignal(tcs, TimeSpan.FromSeconds(3), testCancellationToken);
+        var awaited = AwaitAsync(fakeTask);
 
-        var result1 = await fakeTask;
+        tcs.SetResult();
+
+        var result1 = await awaited.ConfigureAwait(false);
         var result2 = await fakeTask;
-
-        await tcs.Task.ConfigureAwait(false);
 
         Assert.AreEqual(42, result1);
         Assert.AreEqual(42, result2);
@@ -267,11 +268,11 @@ public sealed class FakeTaskOfTTest
 #pragma warning restore
             });
 
-        var task = DelayedSignal(tcs, TimeSpan.FromSeconds(3), testCancellationToken);
+        var awaited = AwaitAsync(fakeTask);
 
-        await Assert.ThrowsAsync<Exception>(async () => await fakeTask, "Oops!").ConfigureAwait(false);
+        tcs.SetResult();
 
-        await tcs.Task.ConfigureAwait(false);
+        await Assert.ThrowsAsync<Exception>(() => awaited, "Oops!").ConfigureAwait(false);
     }
 
     [TestMethod]
@@ -303,7 +304,7 @@ public sealed class FakeTaskOfTTest
             }
         }
 
-        FakeTask.UnobservedContinuationException += Handler;
+        FakeTaskEvents.UnobservedContinuationException += Handler;
 
         try
         {
@@ -321,7 +322,7 @@ public sealed class FakeTaskOfTTest
         }
         finally
         {
-            FakeTask.UnobservedContinuationException -= Handler;
+            FakeTaskEvents.UnobservedContinuationException -= Handler;
         }
     }
 
@@ -410,10 +411,11 @@ public sealed class FakeTaskOfTTest
 
         var fakeTask = RunStateMachine(42, tcs.Task, testCancellationToken);
 
-        var task = DelayedSignal(tcs, TimeSpan.FromSeconds(3), testCancellationToken);
+        var awaited = AwaitAsync(fakeTask);
 
-        var result = await fakeTask;
-        await tcs.Task.ConfigureAwait(false);
+        tcs.SetResult();
+
+        var result = await awaited.ConfigureAwait(false);
 
         Assert.AreEqual(42, result);
 
@@ -478,11 +480,11 @@ public sealed class FakeTaskOfTTest
 
         var fakeTask = RunStateMachine(tcs.Task, testCancellationToken);
 
-        var task = DelayedSignal(tcs, TimeSpan.FromSeconds(3), testCancellationToken);
+        var awaited = AwaitAsync(fakeTask);
 
-        await Assert.ThrowsAsync<Exception>(async () => await fakeTask, "Oops!").ConfigureAwait(false);
+        tcs.SetResult();
 
-        await tcs.Task.ConfigureAwait(false);
+        await Assert.ThrowsAsync<Exception>(() => awaited, "Oops!").ConfigureAwait(false);
 
         static FakeTask<int> RunStateMachine(Task signal, CancellationToken cancellationToken)
         {
@@ -565,6 +567,34 @@ public sealed class FakeTaskOfTTest
         awaiter.Complete();
 
         Assert.AreEqual(0, await fakeTask);
+    }
+
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public void SetResultで完了したFakeTaskMethodBuilderOfTは再度完了させられない()
+    {
+        var builder = FakeTaskMethodBuilder<int>.Create();
+
+        builder.SetResult(42);
+
+#pragma warning disable CA2201
+        Assert.ThrowsExactly<InvalidOperationException>(() => builder.SetResult(42));
+        Assert.ThrowsExactly<InvalidOperationException>(() => builder.SetException(new Exception("Oops!")));
+#pragma warning restore
+    }
+
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public void SetExceptionで完了したFakeTaskMethodBuilderOfTは再度完了させられない()
+    {
+        var builder = FakeTaskMethodBuilder<int>.Create();
+
+#pragma warning disable CA2201
+        builder.SetException(new Exception("Oops!"));
+
+        Assert.ThrowsExactly<InvalidOperationException>(() => builder.SetResult(42));
+        Assert.ThrowsExactly<InvalidOperationException>(() => builder.SetException(new Exception("Oops!")));
+#pragma warning restore
     }
 
     private struct OnCompletedStateMachine<TAwaiter> :
@@ -752,13 +782,11 @@ public sealed class FakeTaskOfTTest
         }
     }
 
-    private static async Task DelayedSignal(
-        TaskCompletionSource tcs,
-        TimeSpan delay,
-        CancellationToken cancellationToken)
+    // 未完了の FakeTask を await して中断する。呼び出しから戻った時点で継続の登録は完了している。
+    private static async Task<TResult> AwaitAsync<TResult>(
+        FakeTask<TResult> fakeTask)
     {
-        await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-        tcs.TrySetResult();
+        return await fakeTask;
     }
 
     private static async FakeTask<TResult> DoAsync<TState, TResult>(TState state, Func<TState, Task<TResult>> action)
