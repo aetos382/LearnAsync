@@ -19,6 +19,8 @@ internal readonly struct Result<T> :
 
     public Result(Exception exception)
     {
+        ArgumentNullException.ThrowIfNull(exception);
+
         this._exception = exception;
         this._kind = Kind.Failed;
     }
