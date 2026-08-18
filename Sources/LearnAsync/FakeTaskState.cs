@@ -41,7 +41,7 @@ internal sealed class FakeTaskState<T>
 
     private IAsyncStateMachine? _stateMachine;
 
-    private readonly List<Action> _continuations = new();
+    private readonly List<Action> _continuations = [];
 
     internal IAsyncStateMachine? StateMachine
     {
@@ -93,8 +93,6 @@ internal sealed class FakeTaskState<T>
     public void SetException(
         Exception exception)
     {
-        ArgumentNullException.ThrowIfNull(exception);
-
         this.Complete(exception);
     }
 
