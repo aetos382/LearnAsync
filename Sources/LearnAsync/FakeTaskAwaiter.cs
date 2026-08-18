@@ -27,6 +27,7 @@ public readonly struct FakeTaskAwaiter :
         get => this._core.IsCompleted;
     }
 
+    /// <inheritdoc/>
     void INotifyCompletion.OnCompleted(
         Action continuation)
     {
@@ -35,6 +36,7 @@ public readonly struct FakeTaskAwaiter :
         this._core.OnCompleted(continuation);
     }
 
+    /// <inheritdoc/>
     void ICriticalNotifyCompletion.UnsafeOnCompleted(
         Action continuation)
     {
