@@ -8,7 +8,6 @@ namespace LearnAsync;
 [AsyncMethodBuilder(typeof(FakeTaskMethodBuilder))]
 public readonly struct FakeTask
 {
-    // 完了済みの状態は二度と変化せず、継続を登録してもその場で実行されるだけなので、共有しても安全。
     private static readonly FakeTaskState<VoidTaskResult> CompletedState = FakeTaskState<VoidTaskResult>.FromResult(default);
 
     private readonly FakeTaskState<VoidTaskResult> _state;
