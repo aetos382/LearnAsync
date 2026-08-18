@@ -41,7 +41,7 @@ internal sealed class FakeTaskState<T>
 
     private IAsyncStateMachine? _stateMachine;
 
-    private readonly List<Action> _continuations = [];
+    private readonly Queue<Action> _continuations = [];
 
     internal IAsyncStateMachine? StateMachine
     {
@@ -77,7 +77,7 @@ internal sealed class FakeTaskState<T>
         {
             if (this._status != FakeTaskStatus.Completed)
             {
-                this._continuations.Add(action);
+                this._continuations.Enqueue(action);
                 return;
             }
         }
@@ -146,7 +146,7 @@ internal sealed class FakeTaskState<T>
             this._status = FakeTaskStatus.Completed;
         }
 
-        foreach (var action in this._continuations)
+        while (this._continuations.TryDequeue(out var action))
         {
             try
             {
@@ -159,7 +159,5 @@ internal sealed class FakeTaskState<T>
             }
 #pragma warning restore
         }
-
-        this._continuations.Clear();
     }
 }
