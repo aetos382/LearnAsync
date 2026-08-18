@@ -16,8 +16,7 @@ internal static class FakeTaskMethodBuilderCore
         // なお、ExecutionContext.SuppressFlow の影響下で実行された場合は元に戻らないが、それは自己責任。await を跨いで SuppressFlow するんじゃない。
 
         // ExecutionContext.Run を使わないのは、ステート マシンをここでボックス化しないため。
-        // Run は状態を object で受けるのでボックス化が必要になり、MoveNext がボックスのコピーを進めてしまって
-        // 呼び出し元のステート マシンに状態が書き戻されない。
+        // Run は状態を object で受けるのでボックス化が必要になり、MoveNext がボックスのコピーを進めてしまって、呼び出し元のステート マシンに状態が書き戻されない。
 
         // SynchronizationContext については FakeTask にとって本質ではないため触らない。
         var previousExecutionContext = ExecutionContext.Capture();
