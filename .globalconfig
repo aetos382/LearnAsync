@@ -18,9 +18,16 @@ csharp_indent_case_contents_when_block = false
 
 csharp_preserve_single_line_statements = false
 
+csharp_style_expression_bodied_operators = when_on_single_line
+csharp_style_expression_bodied_properties = when_on_single_line
+csharp_style_expression_bodied_indexers = when_on_single_line
+csharp_style_expression_bodied_accessors = when_on_single_line
+
 dotnet_analyzer_diagnostic.severity = warning
 
 dotnet_diagnostic.CS1591.severity = suggestion
+
+dotnet_diagnostic.CA1852.severity = suggestion
 
 dotnet_diagnostic.IDE0001.severity = suggestion
 dotnet_diagnostic.IDE0002.severity = none
@@ -28,9 +35,12 @@ dotnet_diagnostic.IDE0003.severity = none
 dotnet_diagnostic.IDE0005.severity = suggestion
 dotnet_diagnostic.IDE0007.severity = suggestion
 dotnet_diagnostic.IDE0008.severity = none
-dotnet_diagnostic.IDE0025.severity = none
-dotnet_diagnostic.IDE0026.severity = none
-dotnet_diagnostic.IDE0027.severity = none
+dotnet_diagnostic.IDE0022.severity = none
+dotnet_diagnostic.IDE0023.severity = suggestion
+dotnet_diagnostic.IDE0024.severity = suggestion
+dotnet_diagnostic.IDE0025.severity = suggestion
+dotnet_diagnostic.IDE0026.severity = suggestion
+dotnet_diagnostic.IDE0027.severity = suggestion
 dotnet_diagnostic.IDE0028.severity = suggestion
 dotnet_diagnostic.IDE0037.severity = suggestion
 dotnet_diagnostic.IDE0045.severity = suggestion
@@ -42,8 +52,6 @@ dotnet_diagnostic.IDE0161.severity = suggestion
 dotnet_diagnostic.IDE0270.severity = silent
 dotnet_diagnostic.IDE0290.severity = suggestion
 dotnet_diagnostic.IDE0305.severity = suggestion
-
-dotnet_diagnostic.CA1852.severity = suggestion
 
 dotnet_naming_symbols.types_and_namespaces.applicable_kinds = class, struct, enum, delegate, namespace
 

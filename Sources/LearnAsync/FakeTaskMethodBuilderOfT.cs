@@ -30,10 +30,7 @@ public readonly struct FakeTaskMethodBuilder<T>
     public FakeTask<T> Task
     {
         [Pure]
-        get
-        {
-            return new(this._core.State);
-        }
+        get => new(this._core.State);
     }
 
     public void Start<TStateMachine>(

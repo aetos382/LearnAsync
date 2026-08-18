@@ -54,7 +54,6 @@ internal readonly struct FakeTaskMethodBuilderCore<T>
         this.State.SetException(exception);
     }
 
-    // ステート マシンを箱に詰めるという副作用があるので Pure ではない。
     [MustUseReturnValue]
     private Action CreateContinuation<TStateMachine>(
         ref TStateMachine stateMachine,

@@ -24,10 +24,7 @@ public readonly struct FakeTask
     public static FakeTask CompletedTask
     {
         [Pure]
-        get
-        {
-            return new(CompletedState);
-        }
+        get => new(CompletedState);
     }
 
     [Pure]

@@ -18,10 +18,7 @@ internal readonly struct FakeTaskAwaiterCore<T>
     public bool IsCompleted
     {
         [Pure]
-        get
-        {
-            return this._state.IsCompleted;
-        }
+        get => this._state.IsCompleted;
     }
 
     public void OnCompleted(
@@ -44,7 +41,6 @@ internal readonly struct FakeTaskAwaiterCore<T>
         this._state.AddContinuationAction(continuation);
     }
 
-    // 完了までブロックするので Pure ではないが、結果を捨てるのは無意味。
     [MustUseReturnValue]
     public T GetResult()
     {

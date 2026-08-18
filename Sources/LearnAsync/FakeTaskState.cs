@@ -51,10 +51,7 @@ internal sealed class FakeTaskState<T>
     internal IAsyncStateMachine? StateMachine
     {
         [Pure]
-        get
-        {
-            return Volatile.Read(ref this._stateMachine);
-        }
+        get => Volatile.Read(ref this._stateMachine);
     }
 
     internal void SetStateMachine(
@@ -73,10 +70,7 @@ internal sealed class FakeTaskState<T>
     public bool IsCompleted
     {
         [Pure]
-        get
-        {
-            return Volatile.Read(ref this._isCompleted);
-        }
+        get => Volatile.Read(ref this._isCompleted);
     }
 
     internal void AddContinuationAction(Action action)
@@ -132,7 +126,6 @@ internal sealed class FakeTaskState<T>
         this.RunContinuations();
     }
 
-    // 完了までブロックするので Pure ではないが、結果を捨てるのは無意味。
     [MustUseReturnValue]
     public T GetResult()
     {

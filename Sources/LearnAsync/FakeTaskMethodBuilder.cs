@@ -28,10 +28,7 @@ public readonly struct FakeTaskMethodBuilder
     public FakeTask Task
     {
         [Pure]
-        get
-        {
-            return new(this._core.State);
-        }
+        get => new(this._core.State);
     }
 
 #pragma warning disable CA1822

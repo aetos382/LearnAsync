@@ -24,10 +24,7 @@ public readonly struct FakeTaskAwaiter :
     public bool IsCompleted
     {
         [Pure]
-        get
-        {
-            return this._core.IsCompleted;
-        }
+        get => this._core.IsCompleted;
     }
 
     void INotifyCompletion.OnCompleted(
