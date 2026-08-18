@@ -56,7 +56,7 @@ public sealed class FakeTaskOfTTest
     [Timeout(10_000, CooperativeCancellation = true)]
     public void 完了済みのFakeTaskOfTに登録した継続はその場で実行される()
     {
-        var fakeTask = DoAsync(static () => Task.FromResult(42));
+        var fakeTask = FakeTask.FromResult(42);
 
         var awaiter = fakeTask.GetAwaiter();
 
