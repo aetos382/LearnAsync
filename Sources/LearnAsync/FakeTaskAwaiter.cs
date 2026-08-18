@@ -1,10 +1,13 @@
 using System;
 using System.Runtime.CompilerServices;
 
+using JetBrains.Annotations;
+
 namespace LearnAsync;
 
 #pragma warning disable CA1815
 
+[PublicAPI]
 public readonly struct FakeTaskAwaiter :
     ICriticalNotifyCompletion
 {
@@ -18,7 +21,14 @@ public readonly struct FakeTaskAwaiter :
         this._core = new(state);
     }
 
-    public bool IsCompleted => this._core.IsCompleted;
+    public bool IsCompleted
+    {
+        [Pure]
+        get
+        {
+            return this._core.IsCompleted;
+        }
+    }
 
     void INotifyCompletion.OnCompleted(
         Action continuation)

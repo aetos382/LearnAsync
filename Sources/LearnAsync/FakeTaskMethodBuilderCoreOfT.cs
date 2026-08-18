@@ -2,11 +2,13 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 
+using JetBrains.Annotations;
+
 namespace LearnAsync;
 
 internal readonly struct FakeTaskMethodBuilderCore<T>
 {
-    public FakeTaskState<T> State { get; }
+    public FakeTaskState<T> State { [Pure] get; }
 
     public FakeTaskMethodBuilderCore()
     {
@@ -52,6 +54,8 @@ internal readonly struct FakeTaskMethodBuilderCore<T>
         this.State.SetException(exception);
     }
 
+    // ステート マシンを箱に詰めるという副作用があるので Pure ではない。
+    [MustUseReturnValue]
     private Action CreateContinuation<TStateMachine>(
         ref TStateMachine stateMachine,
         bool flowExecutionContext)

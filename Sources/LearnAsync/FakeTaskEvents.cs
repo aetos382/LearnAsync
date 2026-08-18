@@ -1,7 +1,10 @@
 using System;
 
+using JetBrains.Annotations;
+
 namespace LearnAsync;
 
+[PublicAPI]
 public static class FakeTaskEvents
 {
     public static event EventHandler<UnobservedContinuationExceptionEventArgs>? UnobservedContinuationException;

@@ -1,15 +1,21 @@
 using System;
 using System.Runtime.CompilerServices;
 
+using JetBrains.Annotations;
+
 namespace LearnAsync;
 
 #pragma warning disable CA1815
 
+// メンバーはコンパイラが生成したステート マシンから呼ばれるので、
+// 未使用と見なされないように型ごと PublicAPI としてマークする。
+[PublicAPI]
 public readonly struct FakeTaskMethodBuilder<T>
 {
     private readonly FakeTaskMethodBuilderCore<T> _core;
 
 #pragma warning disable CA1000
+    [Pure]
     public static FakeTaskMethodBuilder<T> Create()
     {
         return new();
@@ -21,7 +27,14 @@ public readonly struct FakeTaskMethodBuilder<T>
         this._core = new();
     }
 
-    public FakeTask<T> Task => new(this._core.State);
+    public FakeTask<T> Task
+    {
+        [Pure]
+        get
+        {
+            return new(this._core.State);
+        }
+    }
 
     public void Start<TStateMachine>(
         ref TStateMachine stateMachine)

@@ -1,9 +1,12 @@
 using System.Runtime.CompilerServices;
 
+using JetBrains.Annotations;
+
 namespace LearnAsync;
 
 #pragma warning disable CA1815
 
+[PublicAPI]
 [AsyncMethodBuilder(typeof(FakeTaskMethodBuilder<>))]
 public readonly struct FakeTask<T>
 {
@@ -15,6 +18,7 @@ public readonly struct FakeTask<T>
         this._state = state;
     }
 
+    [Pure]
     public FakeTaskAwaiter<T> GetAwaiter()
     {
         return new(this._state);

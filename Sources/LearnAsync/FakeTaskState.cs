@@ -4,10 +4,13 @@ using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 
+using JetBrains.Annotations;
+
 namespace LearnAsync;
 
 internal sealed class FakeTaskState<T>
 {
+    [Pure]
     internal static FakeTaskState<T> FromResult(
         T result)
     {
@@ -18,6 +21,7 @@ internal sealed class FakeTaskState<T>
         return state;
     }
 
+    [Pure]
     internal static FakeTaskState<T> FromException(
         Exception exception)
     {
@@ -44,7 +48,14 @@ internal sealed class FakeTaskState<T>
 
     // 最初の中断でヒープに移されたステート マシンの箱。ビルダーは readonly struct で
     // コピーされてしまうので、コピーをまたいで共有されるここに置く。
-    internal IAsyncStateMachine? StateMachine => Volatile.Read(ref this._stateMachine);
+    internal IAsyncStateMachine? StateMachine
+    {
+        [Pure]
+        get
+        {
+            return Volatile.Read(ref this._stateMachine);
+        }
+    }
 
     internal void SetStateMachine(
         IAsyncStateMachine stateMachine)
@@ -59,7 +70,14 @@ internal sealed class FakeTaskState<T>
         }
     }
 
-    public bool IsCompleted => Volatile.Read(ref this._isCompleted);
+    public bool IsCompleted
+    {
+        [Pure]
+        get
+        {
+            return Volatile.Read(ref this._isCompleted);
+        }
+    }
 
     internal void AddContinuationAction(Action action)
     {
@@ -114,6 +132,8 @@ internal sealed class FakeTaskState<T>
         this.RunContinuations();
     }
 
+    // 完了までブロックするので Pure ではないが、結果を捨てるのは無意味。
+    [MustUseReturnValue]
     public T GetResult()
     {
         // ここで false を観測しても AddContinuationAction が完了を再チェックするので、

@@ -1,7 +1,10 @@
 using System;
 
+using JetBrains.Annotations;
+
 namespace LearnAsync;
 
+[PublicAPI]
 public sealed class UnobservedContinuationExceptionEventArgs :
     EventArgs
 {
@@ -13,5 +16,5 @@ public sealed class UnobservedContinuationExceptionEventArgs :
         this.Exception = exception;
     }
 
-    public Exception Exception { get; }
+    public Exception Exception { [Pure] get; }
 }
