@@ -159,5 +159,7 @@ internal sealed class FakeTaskState<T>
             }
 #pragma warning restore
         }
+
+        this._continuations.Clear();
     }
 }
