@@ -785,7 +785,7 @@ public sealed class FakeTaskTest
 
         public MethodParameters Parameters;
 
-        public State CurrentState { get; set; }
+        public State CurrentState { get; private set; }
 
         private ConfiguredTaskAwaitable.ConfiguredTaskAwaiter _awaiter;
 
