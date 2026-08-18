@@ -1,6 +1,5 @@
 using System;
 using System.Runtime.CompilerServices;
-using System.Threading;
 
 namespace LearnAsync;
 
@@ -9,32 +8,24 @@ namespace LearnAsync;
 public readonly struct FakeTaskAwaiter<T> :
     ICriticalNotifyCompletion
 {
-    private readonly FakeTaskState<T> _state;
+    private readonly FakeTaskAwaiterCore<T> _core;
 
     internal FakeTaskAwaiter(
         FakeTaskState<T> state)
     {
         ArgumentNullException.ThrowIfNull(state);
 
-        this._state = state;
+        this._core = new(state);
     }
 
-    public bool IsCompleted => this._state.IsCompleted;
+    public bool IsCompleted => this._core.IsCompleted;
 
     void INotifyCompletion.OnCompleted(
         Action continuation)
     {
         ArgumentNullException.ThrowIfNull(continuation);
 
-        var executionContext = ExecutionContext.Capture();
-        if (executionContext is null)
-        {
-            this._state.AddContinuationAction(continuation);
-            return;
-        }
-
-        this._state.AddContinuationAction(
-            () => ExecutionContext.Run(executionContext, static state => ((Action)state!)(), continuation));
+        this._core.OnCompleted(continuation);
     }
 
     void ICriticalNotifyCompletion.UnsafeOnCompleted(
@@ -42,11 +33,11 @@ public readonly struct FakeTaskAwaiter<T> :
     {
         ArgumentNullException.ThrowIfNull(continuation);
 
-        this._state.AddContinuationAction(continuation);
+        this._core.UnsafeOnCompleted(continuation);
     }
 
     public T GetResult()
     {
-        return this._state.GetResult();
+        return this._core.GetResult();
     }
 }

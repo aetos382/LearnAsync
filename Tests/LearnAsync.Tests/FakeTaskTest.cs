@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -240,7 +240,7 @@ public sealed class FakeTaskTest
             }
         }
 
-        FakeTaskEvents.UnobservedContinuationException += Handler;
+        FakeTask.UnobservedContinuationException += Handler;
 
         try
         {
@@ -258,7 +258,7 @@ public sealed class FakeTaskTest
         }
         finally
         {
-            FakeTaskEvents.UnobservedContinuationException -= Handler;
+            FakeTask.UnobservedContinuationException -= Handler;
         }
     }
 

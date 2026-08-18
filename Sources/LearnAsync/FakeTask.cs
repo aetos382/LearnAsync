@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.CompilerServices;
 
 namespace LearnAsync;
@@ -7,7 +8,7 @@ namespace LearnAsync;
 [AsyncMethodBuilder(typeof(FakeTaskMethodBuilder))]
 public readonly struct FakeTask
 {
-    private readonly FakeTaskState _state;
+    private readonly FakeTaskState<VoidTaskResult> _state;
 
     public FakeTask()
     {
@@ -15,7 +16,7 @@ public readonly struct FakeTask
     }
 
     internal FakeTask(
-        FakeTaskState state)
+        FakeTaskState<VoidTaskResult> state)
     {
         this._state = state;
     }

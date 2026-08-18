@@ -303,7 +303,7 @@ public sealed class FakeTaskOfTTest
             }
         }
 
-        FakeTaskEvents.UnobservedContinuationException += Handler;
+        FakeTask.UnobservedContinuationException += Handler;
 
         try
         {
@@ -321,7 +321,7 @@ public sealed class FakeTaskOfTTest
         }
         finally
         {
-            FakeTaskEvents.UnobservedContinuationException -= Handler;
+            FakeTask.UnobservedContinuationException -= Handler;
         }
     }
 

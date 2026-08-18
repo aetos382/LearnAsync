@@ -1,6 +1,5 @@
 using System;
 using System.Runtime.CompilerServices;
-using System.Threading;
 
 namespace LearnAsync;
 
@@ -8,7 +7,7 @@ namespace LearnAsync;
 
 public readonly struct FakeTaskMethodBuilder
 {
-    private readonly FakeTaskState _state = new();
+    private readonly FakeTaskMethodBuilderCore<VoidTaskResult> _core;
 
     public static FakeTaskMethodBuilder Create()
     {
@@ -17,31 +16,17 @@ public readonly struct FakeTaskMethodBuilder
 
     public FakeTaskMethodBuilder()
     {
+        this._core = new(new());
     }
 
-    public FakeTask Task => new(this._state);
+    public FakeTask Task => new(this._core.State);
 
 #pragma warning disable CA1822
     public void Start<TStateMachine>(
         ref TStateMachine stateMachine)
         where TStateMachine : IAsyncStateMachine
     {
-        var previousExecutionContext = ExecutionContext.Capture();
-        var previousSynchronizationContext = SynchronizationContext.Current;
-
-        try
-        {
-            stateMachine.MoveNext();
-        }
-        finally
-        {
-            SynchronizationContext.SetSynchronizationContext(previousSynchronizationContext);
-
-            if (previousExecutionContext is not null)
-            {
-                ExecutionContext.Restore(previousExecutionContext);
-            }
-        }
+        FakeTaskMethodBuilderCore.Start(ref stateMachine);
     }
 #pragma warning restore
 
@@ -50,7 +35,7 @@ public readonly struct FakeTaskMethodBuilder
     {
         ArgumentNullException.ThrowIfNull(stateMachine);
 
-        this._state.SetStateMachine(stateMachine);
+        this._core.SetStateMachine(stateMachine);
     }
 
     public void AwaitOnCompleted<TAwaiter, TStateMachine>(
@@ -59,7 +44,7 @@ public readonly struct FakeTaskMethodBuilder
         where TAwaiter : INotifyCompletion
         where TStateMachine : IAsyncStateMachine
     {
-        awaiter.OnCompleted(this.CreateContinuation(ref stateMachine, false));
+        this._core.AwaitOnCompleted(ref awaiter, ref stateMachine);
     }
 
     public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(
@@ -68,12 +53,12 @@ public readonly struct FakeTaskMethodBuilder
         where TAwaiter : ICriticalNotifyCompletion
         where TStateMachine : IAsyncStateMachine
     {
-        awaiter.UnsafeOnCompleted(this.CreateContinuation(ref stateMachine, true));
+        this._core.AwaitUnsafeOnCompleted(ref awaiter, ref stateMachine);
     }
 
     public void SetResult()
     {
-        this._state.SetResult();
+        this._core.SetResult(default);
     }
 
     public void SetException(
@@ -81,26 +66,6 @@ public readonly struct FakeTaskMethodBuilder
     {
         ArgumentNullException.ThrowIfNull(exception);
 
-        this._state.SetException(exception);
-    }
-
-    private Action CreateContinuation<TStateMachine>(
-        ref TStateMachine stateMachine,
-        bool flowExecutionContext)
-        where TStateMachine : IAsyncStateMachine
-    {
-        if (this._state.StateMachine is not { } boxedStateMachine)
-        {
-            boxedStateMachine = stateMachine;
-            boxedStateMachine.SetStateMachine(boxedStateMachine);
-        }
-
-        var context = flowExecutionContext ? ExecutionContext.Capture() : null;
-        if (context is null)
-        {
-            return boxedStateMachine.MoveNext;
-        }
-
-        return () => ExecutionContext.Run(context, static state => ((IAsyncStateMachine)state!).MoveNext(), boxedStateMachine);
+        this._core.SetException(exception);
     }
 }
