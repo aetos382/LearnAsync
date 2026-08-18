@@ -582,6 +582,62 @@ public sealed class FakeTaskTest
 #pragma warning restore
     }
 
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public async Task CompletedTaskは完了済みのFakeTaskを返す()
+    {
+        var fakeTask = FakeTask.CompletedTask;
+
+        Assert.IsTrue(fakeTask.GetAwaiter().IsCompleted);
+
+        await fakeTask;
+    }
+
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public async Task FromResultは結果を持つ完了済みのFakeTaskOfTを返す()
+    {
+        var fakeTask = FakeTask.FromResult(42);
+
+        Assert.IsTrue(fakeTask.GetAwaiter().IsCompleted);
+
+        Assert.AreEqual(42, await fakeTask);
+    }
+
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public async Task FromExceptionは例外で完了済みのFakeTaskを返す()
+    {
+#pragma warning disable CA2201
+        var fakeTask = FakeTask.FromException(new Exception("Oops!"));
+#pragma warning restore
+
+        Assert.IsTrue(fakeTask.GetAwaiter().IsCompleted);
+
+        await Assert.ThrowsAsync<Exception>(async () => await fakeTask, "Oops!").ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public async Task FromExceptionOfTは例外で完了済みのFakeTaskOfTを返す()
+    {
+#pragma warning disable CA2201
+        var fakeTask = FakeTask.FromException<int>(new Exception("Oops!"));
+#pragma warning restore
+
+        Assert.IsTrue(fakeTask.GetAwaiter().IsCompleted);
+
+        await Assert.ThrowsAsync<Exception>(async () => await fakeTask, "Oops!").ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public void FromExceptionにnullを渡すと例外になる()
+    {
+        Assert.ThrowsExactly<ArgumentNullException>(() => FakeTask.FromException(null!));
+        Assert.ThrowsExactly<ArgumentNullException>(() => FakeTask.FromException<int>(null!));
+    }
+
     private struct OnCompletedStateMachine<TAwaiter> :
         IAsyncStateMachine
         where TAwaiter : INotifyCompletion

@@ -8,6 +8,28 @@ namespace LearnAsync;
 
 internal sealed class FakeTaskState<T>
 {
+    internal static FakeTaskState<T> FromResult(
+        T result)
+    {
+        var state = new FakeTaskState<T>();
+
+        state.SetResult(result);
+
+        return state;
+    }
+
+    internal static FakeTaskState<T> FromException(
+        Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+
+        var state = new FakeTaskState<T>();
+
+        state.SetException(exception);
+
+        return state;
+    }
+
     private readonly Lock _lock = new();
 
     private bool _isCompleted;
