@@ -597,6 +597,36 @@ public sealed class FakeTaskOfTTest
 #pragma warning restore
     }
 
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public void FakeTaskMethodBuilderOfTのSetStateMachineは別のステートマシンで呼び直せない()
+    {
+        var builder = FakeTaskMethodBuilder<int>.Create();
+
+        var stateMachine = new DummyStateMachine();
+
+        builder.SetStateMachine(stateMachine);
+
+        // 同じ箱を渡し直すのは何も起こらないので許される。
+        builder.SetStateMachine(stateMachine);
+
+        Assert.ThrowsExactly<InvalidOperationException>(() => builder.SetStateMachine(new DummyStateMachine()));
+    }
+
+    // SetStateMachine に渡すためだけのステート マシン。MoveNext は呼ばれない。
+    private sealed class DummyStateMachine :
+        IAsyncStateMachine
+    {
+        public void MoveNext()
+        {
+        }
+
+        public void SetStateMachine(
+            IAsyncStateMachine stateMachine)
+        {
+        }
+    }
+
     private struct OnCompletedStateMachine<TAwaiter> :
         IAsyncStateMachine
         where TAwaiter : INotifyCompletion

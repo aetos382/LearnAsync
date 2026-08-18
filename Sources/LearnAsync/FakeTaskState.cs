@@ -51,19 +51,15 @@ internal sealed class FakeTaskState<T>
     {
         ArgumentNullException.ThrowIfNull(stateMachine);
 
-        Volatile.Write(ref this._stateMachine, stateMachine);
-    }
+        var original = Interlocked.CompareExchange(ref this._stateMachine, stateMachine, null);
 
-    public bool IsCompleted
-    {
-        get
+        if (original is not null && !ReferenceEquals(original, stateMachine))
         {
-            lock (this._lock)
-            {
-                return this._isCompleted;
-            }
+            throw new InvalidOperationException("state machine already set.");
         }
     }
+
+    public bool IsCompleted => Volatile.Read(ref this._isCompleted);
 
     internal void AddContinuationAction(Action action)
     {
@@ -91,7 +87,8 @@ internal sealed class FakeTaskState<T>
             }
 
             this._result = result;
-            this._isCompleted = true;
+
+            Volatile.Write(ref this._isCompleted, true);
         }
 
         this.RunContinuations();
@@ -110,7 +107,8 @@ internal sealed class FakeTaskState<T>
             }
 
             this._edi = ExceptionDispatchInfo.Capture(exception);
-            this._isCompleted = true;
+
+            Volatile.Write(ref this._isCompleted, true);
         }
 
         this.RunContinuations();
@@ -118,44 +116,38 @@ internal sealed class FakeTaskState<T>
 
     public T GetResult()
     {
-        lock (this._lock)
+        // ここで false を観測しても AddContinuationAction が完了を再チェックするので、
+        // 待機に入ったまま取り残されることはない。
+        if (!Volatile.Read(ref this._isCompleted))
         {
-            if (this._isCompleted)
-            {
-                this._edi?.Throw();
+            using var e = new ManualResetEventSlim(false);
 
-                return this._result!;
-            }
+            this.AddContinuationAction(e.Set);
+
+            e.Wait();
         }
 
-        using var e = new ManualResetEventSlim(false);
+        this._edi?.Throw();
 
-        this.AddContinuationAction(e.Set);
-
-        e.Wait();
-
-        lock (this._lock)
-        {
-            this._edi?.Throw();
-
-            return this._result!;
-        }
+        return this._result!;
     }
 
     private void RunContinuations()
     {
-        while (true)
+        // 完了フラグを立てた後は AddContinuationAction が Enqueue しないので、
+        // ここで一度キューを空にすれば継続を取りこぼすことはない。
+        // 継続の実行はロックの外で行う（任意のユーザー コードを抱えたまま
+        // 他のスレッドをブロックしないため）。
+        Action[] actions;
+
+        lock (this._lock)
         {
-            Action? action;
+            actions = this._continuations.ToArray();
+            this._continuations.Clear();
+        }
 
-            lock (this._lock)
-            {
-                if (!this._continuations.TryDequeue(out action))
-                {
-                    return;
-                }
-            }
-
+        foreach (var action in actions)
+        {
             try
             {
                 action();

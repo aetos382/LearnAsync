@@ -584,6 +584,22 @@ public sealed class FakeTaskTest
 
     [TestMethod]
     [Timeout(10_000, CooperativeCancellation = true)]
+    public void FakeTaskMethodBuilderのSetStateMachineは別のステートマシンで呼び直せない()
+    {
+        var builder = FakeTaskMethodBuilder.Create();
+
+        var stateMachine = new DummyStateMachine();
+
+        builder.SetStateMachine(stateMachine);
+
+        // 同じ箱を渡し直すのは何も起こらないので許される。
+        builder.SetStateMachine(stateMachine);
+
+        Assert.ThrowsExactly<InvalidOperationException>(() => builder.SetStateMachine(new DummyStateMachine()));
+    }
+
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
     public async Task CompletedTaskは完了済みのFakeTaskを返す()
     {
         var fakeTask = FakeTask.CompletedTask;
@@ -636,6 +652,20 @@ public sealed class FakeTaskTest
     {
         Assert.ThrowsExactly<ArgumentNullException>(() => FakeTask.FromException(null!));
         Assert.ThrowsExactly<ArgumentNullException>(() => FakeTask.FromException<int>(null!));
+    }
+
+    // SetStateMachine に渡すためだけのステート マシン。MoveNext は呼ばれない。
+    private sealed class DummyStateMachine :
+        IAsyncStateMachine
+    {
+        public void MoveNext()
+        {
+        }
+
+        public void SetStateMachine(
+            IAsyncStateMachine stateMachine)
+        {
+        }
     }
 
     private struct OnCompletedStateMachine<TAwaiter> :
