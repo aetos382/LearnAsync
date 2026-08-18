@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Runtime.ExceptionServices;
 using System.Threading;
 
 using JetBrains.Annotations;
@@ -36,18 +35,14 @@ internal sealed class FakeTaskState<T>
 
     private readonly Lock _lock = new();
 
-    private bool _isCompleted;
+    private volatile FakeTaskStatus _status;
 
-    private T? _result;
-
-    private ExceptionDispatchInfo? _edi;
+    private Result<T>? _result;
 
     private IAsyncStateMachine? _stateMachine;
 
     private readonly Queue<Action> _continuations = new();
 
-    // 最初の中断でヒープに移されたステート マシンの箱。ビルダーは readonly struct で
-    // コピーされてしまうので、コピーをまたいで共有されるここに置く。
     internal IAsyncStateMachine? StateMachine
     {
         [Pure]
@@ -70,16 +65,17 @@ internal sealed class FakeTaskState<T>
     public bool IsCompleted
     {
         [Pure]
-        get => Volatile.Read(ref this._isCompleted);
+        get => this._status == FakeTaskStatus.Completed;
     }
 
-    internal void AddContinuationAction(Action action)
+    internal void AddContinuationAction(
+        Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
 
         lock (this._lock)
         {
-            if (!this._isCompleted)
+            if (this._status != FakeTaskStatus.Completed)
             {
                 this._continuations.Enqueue(action);
                 return;
@@ -91,19 +87,7 @@ internal sealed class FakeTaskState<T>
 
     public void SetResult(T result)
     {
-        lock (this._lock)
-        {
-            if (this._isCompleted)
-            {
-                throw new InvalidOperationException("task already completed.");
-            }
-
-            this._result = result;
-
-            Volatile.Write(ref this._isCompleted, true);
-        }
-
-        this.RunContinuations();
+        this.Complete(result);
     }
 
     public void SetException(
@@ -111,27 +95,13 @@ internal sealed class FakeTaskState<T>
     {
         ArgumentNullException.ThrowIfNull(exception);
 
-        lock (this._lock)
-        {
-            if (this._isCompleted)
-            {
-                throw new InvalidOperationException("task already completed.");
-            }
-
-            this._edi = ExceptionDispatchInfo.Capture(exception);
-
-            Volatile.Write(ref this._isCompleted, true);
-        }
-
-        this.RunContinuations();
+        this.Complete(exception);
     }
 
     [MustUseReturnValue]
     public T GetResult()
     {
-        // ここで false を観測しても AddContinuationAction が完了を再チェックするので、
-        // 待機に入ったまま取り残されることはない。
-        if (!Volatile.Read(ref this._isCompleted))
+        if (!this.IsCompleted)
         {
             using var e = new ManualResetEventSlim(false);
 
@@ -140,17 +110,40 @@ internal sealed class FakeTaskState<T>
             e.Wait();
         }
 
-        this._edi?.Throw();
+        return this._result!.Value.GetValue();
+    }
 
-        return this._result!;
+    private void Complete(
+        Result<T> result)
+    {
+        this.ReserveCompletion();
+
+        this._result = result;
+
+        this.PublishCompletion();
+        this.RunContinuations();
+    }
+
+    // 完了準備に入る。SetResult と SetException のどちらか一方しか成功させない。
+    private void ReserveCompletion()
+    {
+        var original = Interlocked.CompareExchange(
+            ref this._status, FakeTaskStatus.Completing, FakeTaskStatus.Pending);
+
+        if (original != FakeTaskStatus.Pending)
+        {
+            throw new InvalidOperationException("task already completed.");
+        }
+    }
+
+    // 完了状態にする。IsCompleted = true が外部から観測できるようになる。
+    private void PublishCompletion()
+    {
+        this._status = FakeTaskStatus.Completed;
     }
 
     private void RunContinuations()
     {
-        // 完了フラグを立てた後は AddContinuationAction が Enqueue しないので、
-        // ここで一度キューを空にすれば継続を取りこぼすことはない。
-        // 継続の実行はロックの外で行う（任意のユーザー コードを抱えたまま
-        // 他のスレッドをブロックしないため）。
         Action[] actions;
 
         lock (this._lock)
