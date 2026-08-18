@@ -8,10 +8,9 @@ internal readonly struct FakeTaskMethodBuilderCore<T>
 {
     public FakeTaskState<T> State { get; }
 
-    public FakeTaskMethodBuilderCore(
-        FakeTaskState<T> state)
+    public FakeTaskMethodBuilderCore()
     {
-        this.State = state;
+        this.State = new();
     }
 
     public void SetStateMachine(

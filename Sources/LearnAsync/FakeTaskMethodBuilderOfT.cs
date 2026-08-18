@@ -18,7 +18,7 @@ public readonly struct FakeTaskMethodBuilder<T>
 
     public FakeTaskMethodBuilder()
     {
-        this._core = new(new());
+        this._core = new();
     }
 
     public FakeTask<T> Task => new(this._core.State);
