@@ -5,4 +5,9 @@
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="LearnAsync.Tests" />
+    <InternalsVisibleTo Include="LearnAsync.Tests.RuntimeAsync"  />
+  </ItemGroup>
+
 </Project>

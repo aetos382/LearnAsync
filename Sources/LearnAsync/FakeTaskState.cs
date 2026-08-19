@@ -98,8 +98,8 @@ internal sealed class FakeTaskState<T>
         this.Complete(exception);
     }
 
-    [MustUseReturnValue]
-    public T GetResult()
+    public T GetResult(
+        CancellationToken cancellationToken)
     {
         if (!this.IsCompleted)
         {
@@ -107,7 +107,7 @@ internal sealed class FakeTaskState<T>
 
             this.AddContinuationAction(e.Set);
 
-            e.Wait();
+            e.Wait(cancellationToken);
         }
 
         return this._result!.Value.GetValue();

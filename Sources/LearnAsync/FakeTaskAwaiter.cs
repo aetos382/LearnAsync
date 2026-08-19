@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 using JetBrains.Annotations;
 
@@ -47,6 +48,13 @@ public readonly struct FakeTaskAwaiter :
 
     public void GetResult()
     {
-        _ = this._core.GetResult();
+        this.GetResult(CancellationToken.None);
+    }
+
+    // テスト用に GetResult をキャンセル可能にしたもの
+    internal void GetResult(
+        CancellationToken cancellationToken)
+    {
+        _ = this._core.GetResult(cancellationToken);
     }
 }

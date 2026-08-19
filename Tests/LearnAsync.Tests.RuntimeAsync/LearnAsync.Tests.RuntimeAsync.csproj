@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <!-- 同じテストを Roslyn 生成のステート マシンと runtime-async の両方で走らせるため、テスト コードは LearnAsync.Tests のものを共有する。 -->
-    <Compile Include="..\LearnAsync.Tests\*.cs" Link="%(Filename)%(Extension)" />
+    <Compile Include="..\LearnAsync.Tests\**\*.cs" Link="%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

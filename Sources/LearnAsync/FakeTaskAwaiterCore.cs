@@ -41,9 +41,9 @@ internal readonly struct FakeTaskAwaiterCore<T>
         this._state.AddContinuationAction(continuation);
     }
 
-    [MustUseReturnValue]
-    public T GetResult()
+    public T GetResult(
+        CancellationToken cancellationToken)
     {
-        return this._state.GetResult();
+        return this._state.GetResult(cancellationToken);
     }
 }

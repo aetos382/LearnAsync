@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 using JetBrains.Annotations;
 
@@ -45,9 +46,15 @@ public readonly struct FakeTaskAwaiter<T> :
         this._core.UnsafeOnCompleted(continuation);
     }
 
-    [MustUseReturnValue]
     public T GetResult()
     {
-        return this._core.GetResult();
+        return this.GetResult(CancellationToken.None);
+    }
+
+    // テスト用に GetResult をキャンセル可能にしたもの
+    internal T GetResult(
+        CancellationToken cancellationToken)
+    {
+        return this._core.GetResult(cancellationToken);
     }
 }

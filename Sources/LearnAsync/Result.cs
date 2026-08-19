@@ -11,13 +11,15 @@ namespace LearnAsync;
 internal readonly struct Result<T> :
     IUnion
 {
-    public Result(T value)
+    public Result(
+        T value)
     {
         this._value = value;
         this._kind = Kind.Succeeded;
     }
 
-    public Result(Exception exception)
+    public Result(
+        Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
 
@@ -38,7 +40,8 @@ internal readonly struct Result<T> :
 
     private readonly Exception? _exception;
 
-    public bool TryGetValue(out T? value)
+    public bool TryGetValue(
+        out T? value)
     {
         if (this._kind is not Kind.Succeeded)
         {
@@ -50,7 +53,8 @@ internal readonly struct Result<T> :
         return true;
     }
 
-    public bool TryGetValue([MaybeNullWhen(false)] out Exception exception)
+    public bool TryGetValue(
+        [MaybeNullWhen(false)] out Exception exception)
     {
         if (this._kind is not Kind.Failed)
         {

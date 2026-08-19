@@ -49,6 +49,7 @@ dotnet_diagnostic.IDE0058.severity = none
 dotnet_diagnostic.IDE0072.severity = suggestion
 dotnet_diagnostic.IDE0160.severity = none
 dotnet_diagnostic.IDE0161.severity = suggestion
+dotnet_diagnostic.IDE0200.severity = suggestion
 dotnet_diagnostic.IDE0270.severity = silent
 dotnet_diagnostic.IDE0290.severity = suggestion
 dotnet_diagnostic.IDE0305.severity = suggestion
