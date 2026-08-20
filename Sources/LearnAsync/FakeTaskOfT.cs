@@ -18,6 +18,8 @@ public readonly struct FakeTask<T>
         this._state = state;
     }
 
+    public int Id => this._state.Id;
+
     [Pure]
     public FakeTaskAwaiter<T> GetAwaiter()
     {

@@ -9,6 +9,6 @@
     <GlobalPackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" Condition="'$(TargetFrameworkIdentifier)' == '.NETFramework'" />
   </ItemGroup>
   <ItemGroup>
-    <PackageVersion Include="JetBrains.Annotations" Version="2026.2.0"/>
+    <PackageVersion Include="JetBrains.Annotations" Version="2026.2.0" />
   </ItemGroup>
 </Project>

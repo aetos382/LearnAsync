@@ -52,6 +52,8 @@ public readonly struct FakeTask
         return new(FakeTaskState<T>.FromException(exception));
     }
 
+    public int Id => this._state.Id;
+
     [Pure]
     public FakeTaskAwaiter GetAwaiter()
     {

@@ -10,7 +10,7 @@ namespace LearnAsync;
 internal sealed class FakeTaskState<T>
 {
     [Pure]
-    internal static FakeTaskState<T> FromResult(
+    public static FakeTaskState<T> FromResult(
         T result)
     {
         var state = new FakeTaskState<T>();
@@ -21,7 +21,7 @@ internal sealed class FakeTaskState<T>
     }
 
     [Pure]
-    internal static FakeTaskState<T> FromException(
+    public static FakeTaskState<T> FromException(
         Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
@@ -43,13 +43,26 @@ internal sealed class FakeTaskState<T>
 
     private readonly Queue<Action> _continuations = [];
 
-    internal IAsyncStateMachine? StateMachine
+    public int Id
+    {
+        get
+        {
+            if (Volatile.Read(ref field) == 0)
+            {
+                Interlocked.CompareExchange(ref field, IdStorage.NewId(), 0);
+            }
+
+            return field;
+        }
+    }
+
+    public IAsyncStateMachine? StateMachine
     {
         [Pure]
         get => Volatile.Read(ref this._stateMachine);
     }
 
-    internal void SetStateMachine(
+    public void SetStateMachine(
         IAsyncStateMachine stateMachine)
     {
         ArgumentNullException.ThrowIfNull(stateMachine);
@@ -68,7 +81,7 @@ internal sealed class FakeTaskState<T>
         get => this._status == FakeTaskStatus.Completed;
     }
 
-    internal void AddContinuationAction(
+    public void AddContinuationAction(
         Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
